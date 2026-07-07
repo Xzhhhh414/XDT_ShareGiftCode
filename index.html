@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>心动小镇兑换码聚合</title>
+    <meta
+      name="description"
+      content="玩家向心动小镇兑换码聚合工具，支持查看、复制和反馈兑换码状态。"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="brand-block">
+          <h1>心动小镇兑换码</h1>
+          <p class="meta-line">
+            <span id="updatedAt">更新中</span>
+          </p>
+        </div>
+      </header>
+
+      <section class="redeem-inline" aria-label="兑换码使用方法">
+        <span>兑换码使用方法：点击手表内“设置”</span>
+        <span>点击底部“兑换码”入口</span>
+        <span>输入兑换码即可</span>
+      </section>
+
+      <main class="workspace">
+        <section class="content-panel" aria-label="兑换码列表">
+          <div class="code-list" id="codeList"></div>
+          <div class="empty-state" id="emptyState" hidden>
+            <p>当前没有可展示的兑换码</p>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <div class="feedback-modal" id="feedbackModal" role="dialog" aria-modal="true" aria-labelledby="feedbackModalTitle" hidden>
+      <div class="feedback-dialog">
+        <button class="modal-close" type="button" data-action="close-feedback" aria-label="关闭">×</button>
+        <h2 class="modal-title" id="feedbackModalTitle">发布使用结果</h2>
+        <p class="modal-copy">感谢你帮助其他玩家确认礼包码状态，请选择这次兑换结果。</p>
+        <div class="feedback-options" aria-label="使用结果">
+          <button class="feedback-option" type="button" data-feedback-result="valid">可用</button>
+          <button class="feedback-option danger" type="button" data-feedback-result="invalid">失效</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <script src="./data/codes.js"></script>
+    <script src="./script.js"></script>
+  </body>
+</html>
