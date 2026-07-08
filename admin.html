@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>心动小镇兑换码后台</title>
+    <meta name="description" content="心动小镇兑换码聚合工具本地审核后台。" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-shell admin-shell">
+      <header class="admin-header">
+        <div>
+          <h1>兑换码后台</h1>
+          <p class="meta-line">
+            <span id="adminUpdatedAt">加载中</span>
+          </p>
+        </div>
+      </header>
+
+      <nav class="admin-tabs" aria-label="审核类型">
+        <button class="admin-tab" type="button" data-admin-tab="submissions">
+          <span>新兑换码</span>
+          <span class="admin-count" id="submissionCount">0</span>
+        </button>
+        <button class="admin-tab" type="button" data-admin-tab="rewardFeedback">
+          <span>奖励补充</span>
+          <span class="admin-count" id="rewardFeedbackCount">0</span>
+        </button>
+        <button class="admin-tab" type="button" data-admin-tab="feedback">
+          <span>使用结果</span>
+          <span class="admin-count" id="feedbackCount">0</span>
+        </button>
+      </nav>
+
+      <main class="admin-panel" id="adminPanel" tabindex="-1"></main>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <script src="./admin.js"></script>
+  </body>
+</html>

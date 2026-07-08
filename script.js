@@ -1,5 +1,8 @@
 const state = {
   codes: [],
+  updatedAt: "",
+  usesServer: false,
+  clientId: getClientId(),
   feedback: readJson("xdt-gift-code-feedback", {}),
   rewardFeedback: readJson("xdt-gift-code-reward-feedback", {})
 };
@@ -8,6 +11,13 @@ const codeList = document.querySelector("#codeList");
 const emptyState = document.querySelector("#emptyState");
 const toast = document.querySelector("#toast");
 const feedbackModal = document.querySelector("#feedbackModal");
+const submissionModal = document.querySelector("#submissionModal");
+const submissionForm = document.querySelector("#submissionForm");
+const submissionTitleInput = document.querySelector("#submissionTitleInput");
+const submissionCodeInput = document.querySelector("#submissionCodeInput");
+const submissionRewardInput = document.querySelector("#submissionRewardInput");
+const submissionExpireInput = document.querySelector("#submissionExpireInput");
+const submissionSourceInput = document.querySelector("#submissionSourceInput");
 const rewardModal = document.querySelector("#rewardModal");
 const rewardForm = document.querySelector("#rewardForm");
 const rewardInput = document.querySelector("#rewardInput");
@@ -15,12 +25,36 @@ const rewardInput = document.querySelector("#rewardInput");
 let activeFeedbackItem = null;
 let activeRewardItem = null;
 
-function init() {
-  state.codes = normalizeCodes(window.GIFT_CODE_DATA?.codes || []);
+async function init() {
   bindFeedbackModal();
+  bindSubmissionModal();
   bindRewardModal();
+  await loadCodes();
   renderUpdatedAt();
   renderList();
+}
+
+async function loadCodes() {
+  try {
+    const response = await fetch("/api/gift-codes", {
+      headers: {
+        Accept: "application/json"
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error("failed to load gift codes");
+    }
+
+    const payload = await response.json();
+    state.usesServer = true;
+    state.updatedAt = payload.updatedAt || "";
+    state.codes = normalizeCodes(payload.codes || []);
+  } catch {
+    state.usesServer = false;
+    state.updatedAt = window.GIFT_CODE_DATA?.updatedAt || "";
+    state.codes = normalizeCodes(window.GIFT_CODE_DATA?.codes || []);
+  }
 }
 
 function normalizeCodes(codes) {
@@ -74,7 +108,7 @@ function getPublishedTime(item) {
 }
 
 function renderUpdatedAt() {
-  document.querySelector("#updatedAt").textContent = `最近更新 ${formatDateTime(window.GIFT_CODE_DATA?.updatedAt)}`;
+  document.querySelector("#updatedAt").textContent = `最近更新 ${formatDateTime(state.updatedAt)}`;
 }
 
 function renderList() {
@@ -140,6 +174,125 @@ function createCodeCard(item) {
   card.querySelector('[data-action="open-reward"]')?.addEventListener("click", () => openRewardModal(item));
 
   return card;
+}
+
+function bindSubmissionModal() {
+  document.querySelector('[data-action="open-submission"]')?.addEventListener("click", openSubmissionModal);
+
+  submissionModal?.addEventListener("click", (event) => {
+    if (event.target === submissionModal || event.target.closest('[data-action="close-submission"]')) {
+      closeSubmissionModal();
+    }
+  });
+
+  submissionForm?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    submitCodeSubmission();
+  });
+
+  submissionExpireInput?.addEventListener("click", openSubmissionExpirePicker);
+  submissionExpireInput?.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      openSubmissionExpirePicker();
+    }
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !submissionModal?.hidden) {
+      closeSubmissionModal();
+    }
+  });
+}
+
+function openSubmissionExpirePicker() {
+  submissionExpireInput.focus({ preventScroll: true });
+
+  if (typeof submissionExpireInput.showPicker !== "function") {
+    return;
+  }
+
+  try {
+    submissionExpireInput.showPicker();
+  } catch {
+    // Some browsers throw when the native picker is already open.
+  }
+}
+
+function openSubmissionModal() {
+  if (!state.usesServer) {
+    showToast("需要启动本地服务后才能提交兑换码");
+    return;
+  }
+
+  submissionModal.hidden = false;
+  document.body.classList.add("modal-open");
+  submissionCodeInput.focus();
+}
+
+function closeSubmissionModal() {
+  submissionModal.hidden = true;
+  document.body.classList.remove("modal-open");
+  submissionForm?.reset();
+}
+
+async function submitCodeSubmission() {
+  const title = submissionTitleInput.value.trim();
+  const code = submissionCodeInput.value.trim().replace(/\s+/g, "");
+  const reward = submissionRewardInput.value.trim();
+  const expireAt = submissionExpireInput.value;
+  const sourceUrl = submissionSourceInput.value.trim();
+
+  if (!title) {
+    showToast("请填写名称");
+    submissionTitleInput.focus();
+    return;
+  }
+
+  if (!code) {
+    showToast("请填写兑换码");
+    submissionCodeInput.focus();
+    return;
+  }
+
+  if (!reward) {
+    showToast("请填写奖励");
+    submissionRewardInput.focus();
+    return;
+  }
+
+  if (!expireAt) {
+    showToast("请填写有效期");
+    submissionExpireInput.focus();
+    return;
+  }
+
+  try {
+    await postJson("/api/submissions", {
+      title,
+      code,
+      reward,
+      expireAt,
+      sourceUrl,
+      clientId: state.clientId
+    });
+    showToast("已提交，等待审核");
+    closeSubmissionModal();
+  } catch (error) {
+    if (error.message === "code_already_exists") {
+      showToast("这个兑换码已经存在");
+      submissionCodeInput.focus();
+      return;
+    }
+
+    if (error.message === "submission_already_exists") {
+      showToast("这个兑换码已经有人提交，等待审核中");
+      submissionCodeInput.focus();
+      return;
+    }
+
+    showToast("提交失败，请稍后再试");
+  }
 }
 
 function bindFeedbackModal() {
@@ -214,7 +367,7 @@ function closeRewardModal() {
   rewardForm?.reset();
 }
 
-function submitRewardFeedback() {
+async function submitRewardFeedback() {
   if (!activeRewardItem) {
     return;
   }
@@ -223,6 +376,25 @@ function submitRewardFeedback() {
   if (!reward) {
     showToast("请填写奖励内容");
     rewardInput.focus();
+    return;
+  }
+
+  if (state.usesServer) {
+    try {
+      const payload = await postJson(`/api/gift-codes/${encodeURIComponent(activeRewardItem.code)}/reward-feedback`, {
+        reward,
+        clientId: state.clientId
+      });
+      state.updatedAt = payload.updatedAt || state.updatedAt;
+      showToast("已提交奖励内容，等待审核");
+      closeRewardModal();
+      renderUpdatedAt();
+      renderList();
+    } catch {
+      showToast("提交失败，请稍后再试");
+      rewardInput.focus();
+    }
+
     return;
   }
 
@@ -271,7 +443,26 @@ function writeClipboard(text) {
   return ok ? Promise.resolve() : Promise.reject(new Error("copy failed"));
 }
 
-function voteCode(item, vote) {
+async function voteCode(item, vote) {
+  if (state.usesServer) {
+    try {
+      const payload = await postJson(`/api/gift-codes/${encodeURIComponent(item.code)}/feedback`, {
+        result: vote,
+        clientId: state.clientId
+      });
+      item.latestFeedback = payload.latestFeedback;
+      state.updatedAt = payload.updatedAt || state.updatedAt;
+      item.computedStatus = computeStatus(item);
+      showToast(vote === "valid" ? "已提交可用反馈" : "已提交失效反馈");
+      renderUpdatedAt();
+      renderList();
+    } catch {
+      showToast("提交失败，请稍后再试");
+    }
+
+    return;
+  }
+
   state.feedback[item.feedbackKey] = {
     result: vote,
     votedAt: new Date().toISOString()
@@ -343,7 +534,7 @@ function formatPublishedAt(item) {
 }
 
 function getRewardText(item) {
-  return getLocalRewardFeedback(item)?.reward || item.reward || "奖励待确认";
+  return (!state.usesServer ? getLocalRewardFeedback(item)?.reward : "") || item.reward || "奖励待确认";
 }
 
 function getLocalRewardFeedback(item) {
@@ -367,7 +558,7 @@ function normalizeRewardFeedback(feedback) {
 }
 
 function needsRewardFeedback(item) {
-  return isPendingReward(item.reward) && !getLocalRewardFeedback(item);
+  return isPendingReward(item.sourceReward ?? item.reward);
 }
 
 function isPendingReward(value) {
@@ -389,6 +580,10 @@ function formatValidityLine(item, hasExplicitExpire, latestFeedback) {
 
 function getLatestFeedback(item) {
   const remoteFeedback = normalizeFeedback(item.latestFeedback);
+  if (state.usesServer) {
+    return remoteFeedback;
+  }
+
   const localFeedback = normalizeFeedback(state.feedback[item.feedbackKey]);
 
   if (!remoteFeedback) {
@@ -525,6 +720,43 @@ function writeJson(key, value) {
   localStorage.setItem(key, JSON.stringify(value));
 }
 
+async function postJson(url, body) {
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json"
+    },
+    body: JSON.stringify(body)
+  });
+
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({}));
+    throw new Error(payload.error || "request failed");
+  }
+
+  return response.json();
+}
+
+function getClientId() {
+  const key = "xdt-gift-code-client-id";
+  const clientId =
+    window.crypto?.randomUUID?.() || `client-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
+  try {
+    const existing = localStorage.getItem(key);
+    if (existing) {
+      return existing;
+    }
+
+    localStorage.setItem(key, clientId);
+  } catch {
+    return clientId;
+  }
+
+  return clientId;
+}
+
 function escapeHtml(value) {
   return String(value)
     .replaceAll("&", "&amp;")
@@ -538,4 +770,6 @@ function escapeAttr(value) {
   return escapeHtml(value || "#");
 }
 
-init();
+init().catch(() => {
+  showToast("页面初始化失败，请刷新重试");
+});

@@ -19,6 +19,7 @@
             <span id="updatedAt">更新中</span>
           </p>
         </div>
+        <button class="topbar-action" type="button" data-action="open-submission">分享新的兑换码</button>
       </header>
 
       <section class="redeem-inline" aria-label="兑换码使用方法">
@@ -35,6 +36,61 @@
           </div>
         </section>
       </main>
+    </div>
+
+    <div class="feedback-modal" id="submissionModal" role="dialog" aria-modal="true" aria-labelledby="submissionModalTitle" hidden>
+      <div class="feedback-dialog">
+        <button class="modal-close" type="button" data-action="close-submission" aria-label="关闭">×</button>
+        <h2 class="modal-title" id="submissionModalTitle">分享新的兑换码</h2>
+        <p class="modal-copy">感谢你补充新的礼包码。提交后会进入待审核，不会立刻展示给其他玩家。</p>
+        <form class="reward-form" id="submissionForm">
+          <label class="field-label" for="submissionTitleInput">名称</label>
+          <input
+            class="field-input"
+            id="submissionTitleInput"
+            name="title"
+            maxlength="40"
+            placeholder="例如：今日限时礼包码"
+            required
+          />
+          <label class="field-label" for="submissionCodeInput">兑换码</label>
+          <input
+            class="field-input"
+            id="submissionCodeInput"
+            name="code"
+            maxlength="40"
+            placeholder="例如：HAPPYTOWN"
+            required
+          />
+          <label class="field-label" for="submissionRewardInput">奖励</label>
+          <input
+            class="field-input"
+            id="submissionRewardInput"
+            name="reward"
+            maxlength="80"
+            placeholder="例如：金币、家具材料"
+            required
+          />
+          <label class="field-label" for="submissionExpireInput">有效期</label>
+          <input
+            class="field-input date-field-input"
+            id="submissionExpireInput"
+            name="expireAt"
+            type="date"
+            required
+          />
+          <label class="field-label" for="submissionSourceInput">来源链接或说明（选填）</label>
+          <textarea
+            class="reward-input"
+            id="submissionSourceInput"
+            name="sourceUrl"
+            rows="3"
+            maxlength="160"
+            placeholder="可以填写你看到兑换码的位置，方便后续审核"
+          ></textarea>
+          <button class="feedback-option" type="submit">提交</button>
+        </form>
+      </div>
     </div>
 
     <div class="feedback-modal" id="feedbackModal" role="dialog" aria-modal="true" aria-labelledby="feedbackModalTitle" hidden>
