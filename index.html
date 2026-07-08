@@ -49,6 +49,27 @@
       </div>
     </div>
 
+    <div class="feedback-modal" id="rewardModal" role="dialog" aria-modal="true" aria-labelledby="rewardModalTitle" hidden>
+      <div class="feedback-dialog">
+        <button class="modal-close" type="button" data-action="close-reward" aria-label="关闭">×</button>
+        <h2 class="modal-title" id="rewardModalTitle">分享奖励内容</h2>
+        <p class="modal-copy">感谢你帮助其他玩家补充礼包奖励，请填写这次兑换后看到的奖励内容。</p>
+        <form class="reward-form" id="rewardForm">
+          <label class="field-label" for="rewardInput">奖励内容</label>
+          <textarea
+            class="reward-input"
+            id="rewardInput"
+            name="reward"
+            rows="3"
+            maxlength="80"
+            placeholder="例如：金币、家具材料、服装券"
+            required
+          ></textarea>
+          <button class="feedback-option" type="submit">提交</button>
+        </form>
+      </div>
+    </div>
+
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
     <script src="./data/codes.js"></script>

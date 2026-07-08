@@ -40,7 +40,8 @@ body.modal-open {
 }
 
 button,
-input {
+input,
+textarea {
   font: inherit;
 }
 
@@ -214,13 +215,38 @@ h2 {
   gap: 10px;
 }
 
+.card-header {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
 .card-title {
-  margin: 0 0 12px;
+  min-width: 0;
+  margin: 0;
   color: var(--text);
   font-size: 16px;
   font-weight: 760;
   line-height: 1.25;
   overflow-wrap: anywhere;
+}
+
+.publish-badge {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  border: 1px solid rgba(201, 133, 20, 0.2);
+  border-radius: 999px;
+  background: #fff8e8;
+  color: #8b5b07;
+  font-size: 12px;
+  font-weight: 760;
+  line-height: 1.2;
+  padding: 4px 8px;
+  white-space: nowrap;
 }
 
 .code-text {
@@ -235,10 +261,10 @@ h2 {
   overflow-wrap: anywhere;
   color: var(--text);
   font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
-  font-size: 17px;
+  font-size: 15px;
   font-weight: 620;
   line-height: 1.18;
-  padding: 4px 7px;
+  padding: 3px 6px;
   user-select: all;
 }
 
@@ -291,9 +317,12 @@ h2 {
 
 .copy-button {
   flex: 0 0 auto;
-  min-width: 70px;
-  min-height: 30px;
-  padding: 0 9px;
+  min-width: 56px;
+  min-height: 26px;
+  gap: 5px;
+  padding: 0 7px;
+  font-size: 13px;
+  font-weight: 680;
 }
 
 .icon-text-button.secondary {
@@ -325,13 +354,19 @@ h2 {
 }
 
 .feedback-prompt {
-  display: block;
+  display: grid;
   min-width: 0;
+  gap: 8px;
   border-top: 1px solid var(--line);
   padding-top: 12px;
 }
 
+.feedback-prompt.is-split {
+  display: flex;
+}
+
 .feedback-open-button {
+  min-width: 0;
   width: 100%;
   min-height: 34px;
   border-color: var(--line);
@@ -340,6 +375,11 @@ h2 {
   font-size: 13px;
   font-weight: 760;
   padding: 0 12px;
+}
+
+.feedback-prompt.is-split .feedback-open-button {
+  flex: 1 1 0;
+  width: auto;
 }
 
 .feedback-modal {
@@ -398,6 +438,36 @@ h2 {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 10px;
+}
+
+.reward-form {
+  display: grid;
+  gap: 10px;
+}
+
+.field-label {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 760;
+}
+
+.reward-input {
+  width: 100%;
+  min-height: 86px;
+  resize: vertical;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #fbfdfc;
+  color: var(--text);
+  outline: none;
+  padding: 10px 12px;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.reward-input:focus {
+  border-color: rgba(31, 138, 91, 0.52);
+  box-shadow: 0 0 0 3px rgba(31, 138, 91, 0.1);
 }
 
 .feedback-option {
@@ -498,11 +568,17 @@ h2 {
   }
 
   .code-text {
-    font-size: 17px;
+    font-size: 15px;
   }
 
   .code-title-row {
     gap: 10px;
+  }
+
+  .card-header {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
   }
 
   .code-actions {
@@ -510,8 +586,12 @@ h2 {
   }
 
   .copy-button {
-    min-width: 70px;
-    min-height: 30px;
+    min-width: 56px;
+    min-height: 26px;
+  }
+
+  .feedback-open-button {
+    padding: 0 8px;
   }
 }
 

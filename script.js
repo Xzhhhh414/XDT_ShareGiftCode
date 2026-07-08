@@ -1,18 +1,24 @@
 const state = {
   codes: [],
-  feedback: readJson("xdt-gift-code-feedback", {})
+  feedback: readJson("xdt-gift-code-feedback", {}),
+  rewardFeedback: readJson("xdt-gift-code-reward-feedback", {})
 };
 
 const codeList = document.querySelector("#codeList");
 const emptyState = document.querySelector("#emptyState");
 const toast = document.querySelector("#toast");
 const feedbackModal = document.querySelector("#feedbackModal");
+const rewardModal = document.querySelector("#rewardModal");
+const rewardForm = document.querySelector("#rewardForm");
+const rewardInput = document.querySelector("#rewardInput");
 
 let activeFeedbackItem = null;
+let activeRewardItem = null;
 
 function init() {
   state.codes = normalizeCodes(window.GIFT_CODE_DATA?.codes || []);
   bindFeedbackModal();
+  bindRewardModal();
   renderUpdatedAt();
   renderList();
 }
@@ -93,21 +99,27 @@ function getDisplayableCodes() {
 function createCodeCard(item) {
   const hasExplicitExpire = Boolean(parseDate(item.expireAt));
   const latestFeedback = getLatestFeedback(item);
-  const feedbackActions =
+  const rewardText = getRewardText(item);
+  const actionButtons = [
+    needsRewardFeedback(item)
+      ? '<button class="feedback-open-button" type="button" data-action="open-reward">分享奖励内容</button>'
+      : "",
     item.computedStatus === "unknown"
-      ? `
-        <div class="feedback-prompt">
-          <button class="feedback-open-button" type="button" data-action="open-feedback">欢迎分享使用结果</button>
-        </div>
-      `
-      : "";
+      ? '<button class="feedback-open-button" type="button" data-action="open-feedback">分享使用结果</button>'
+      : ""
+  ].filter(Boolean);
+  const actionClass = actionButtons.length > 1 ? "feedback-prompt is-split" : "feedback-prompt";
+  const actions = actionButtons.length ? `<div class="${actionClass}">${actionButtons.join("")}</div>` : "";
   const card = document.createElement("article");
   card.className = "code-card";
   card.dataset.code = item.code;
 
   card.innerHTML = `
     <div class="code-main">
-      <h2 class="card-title">${escapeHtml(getCardTitle(item, hasExplicitExpire, latestFeedback))}</h2>
+      <div class="card-header">
+        <h2 class="card-title">${escapeHtml(getCardTitle(item, hasExplicitExpire, latestFeedback))}</h2>
+        <span class="publish-badge">${escapeHtml(formatPublishedAt(item))}</span>
+      </div>
       <div class="code-title-row">
         <span class="code-text">${escapeHtml(item.code)}</span>
         <button class="icon-text-button primary copy-button" type="button" data-action="copy">
@@ -115,16 +127,17 @@ function createCodeCard(item) {
           <span>复制</span>
         </button>
       </div>
-      <p class="reward-text">${escapeHtml(item.reward || "奖励待确认")}</p>
+      <p class="reward-text">${escapeHtml(rewardText)}</p>
       <div class="code-meta-row">
         <span>${formatValidityLine(item, hasExplicitExpire, latestFeedback)}</span>
       </div>
     </div>
-    ${feedbackActions ? `<div class="code-actions">${feedbackActions}</div>` : ""}
+    ${actions ? `<div class="code-actions">${actions}</div>` : ""}
   `;
 
   card.querySelector('[data-action="copy"]').addEventListener("click", (event) => copyCode(event, item));
   card.querySelector('[data-action="open-feedback"]')?.addEventListener("click", () => openFeedbackModal(item));
+  card.querySelector('[data-action="open-reward"]')?.addEventListener("click", () => openRewardModal(item));
 
   return card;
 }
@@ -165,6 +178,62 @@ function closeFeedbackModal() {
   feedbackModal.hidden = true;
   document.body.classList.remove("modal-open");
   activeFeedbackItem = null;
+}
+
+function bindRewardModal() {
+  rewardModal?.addEventListener("click", (event) => {
+    if (event.target === rewardModal || event.target.closest('[data-action="close-reward"]')) {
+      closeRewardModal();
+    }
+  });
+
+  rewardForm?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    submitRewardFeedback();
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !rewardModal?.hidden) {
+      closeRewardModal();
+    }
+  });
+}
+
+function openRewardModal(item) {
+  activeRewardItem = item;
+  rewardInput.value = getLocalRewardFeedback(item)?.reward || "";
+  rewardModal.hidden = false;
+  document.body.classList.add("modal-open");
+  rewardInput.focus();
+}
+
+function closeRewardModal() {
+  rewardModal.hidden = true;
+  document.body.classList.remove("modal-open");
+  activeRewardItem = null;
+  rewardForm?.reset();
+}
+
+function submitRewardFeedback() {
+  if (!activeRewardItem) {
+    return;
+  }
+
+  const reward = rewardInput.value.trim().replace(/\s+/g, " ");
+  if (!reward) {
+    showToast("请填写奖励内容");
+    rewardInput.focus();
+    return;
+  }
+
+  state.rewardFeedback[activeRewardItem.feedbackKey] = {
+    reward,
+    submittedAt: new Date().toISOString()
+  };
+  writeJson("xdt-gift-code-reward-feedback", state.rewardFeedback);
+  showToast("已记录奖励内容");
+  closeRewardModal();
+  renderList();
 }
 
 async function copyCode(event, item) {
@@ -248,8 +317,8 @@ function getCardTitle(item, hasExplicitExpire, latestFeedback) {
     return explicitTitle;
   }
 
-  const reward = String(item.reward || "").trim();
-  if (reward && reward !== "奖励待确认") {
+  const reward = getRewardText(item);
+  if (!isPendingReward(reward)) {
     return `${reward.replace(/[、，,]/g, "")}兑换码`;
   }
 
@@ -266,6 +335,44 @@ function getCardTitle(item, hasExplicitExpire, latestFeedback) {
   }
 
   return "待验证礼包兑换码";
+}
+
+function formatPublishedAt(item) {
+  const publishedAt = item.firstSeenAt || item.lastSeenAt;
+  return `发布日期 ${formatMonthDay(publishedAt)}`;
+}
+
+function getRewardText(item) {
+  return getLocalRewardFeedback(item)?.reward || item.reward || "奖励待确认";
+}
+
+function getLocalRewardFeedback(item) {
+  return normalizeRewardFeedback(state.rewardFeedback[item.feedbackKey]);
+}
+
+function normalizeRewardFeedback(feedback) {
+  if (!feedback) {
+    return null;
+  }
+
+  const reward = String(feedback.reward || "").trim();
+  if (!reward) {
+    return null;
+  }
+
+  return {
+    reward,
+    submittedAt: feedback.submittedAt || feedback.at || ""
+  };
+}
+
+function needsRewardFeedback(item) {
+  return isPendingReward(item.reward) && !getLocalRewardFeedback(item);
+}
+
+function isPendingReward(value) {
+  const reward = String(value || "").trim();
+  return !reward || reward === "奖励待确认" || reward === "待确认" || reward === "来源未明确";
 }
 
 function formatValidityLine(item, hasExplicitExpire, latestFeedback) {
@@ -360,6 +467,19 @@ function formatDate(value) {
     day: "2-digit",
     hour: "2-digit",
     minute: "2-digit"
+  }).format(date);
+}
+
+function formatMonthDay(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "待确认";
+  }
+
+  return new Intl.DateTimeFormat("zh-CN", {
+    timeZone: "Asia/Shanghai",
+    month: "2-digit",
+    day: "2-digit"
   }).format(date);
 }
 
