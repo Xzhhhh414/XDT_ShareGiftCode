@@ -13,3 +13,4 @@ coverage/
 
 *.log
 server/db.json
+docs/imports/

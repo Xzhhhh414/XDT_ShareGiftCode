@@ -1,11 +1,18 @@
-const ADMIN_TABS = ["submissions", "rewardFeedback", "feedback"];
+const ADMIN_TABS = ["sourceParser", "codes", "submissions", "rewardFeedback", "feedback"];
 
 const adminState = {
   activeTab: getInitialTab(),
   updatedAt: "",
+  codes: [],
   submissions: [],
   rewardFeedback: [],
-  feedback: []
+  feedback: [],
+  sourceDraft: {
+    importFile: null,
+    importFileName: "",
+    candidates: [],
+    parsed: false
+  }
 };
 
 const toast = document.querySelector("#toast");
@@ -17,7 +24,17 @@ initAdmin().catch(() => {
 
 async function initAdmin() {
   bindAdminTabs();
+  await ensureAdminSession();
   await refreshAdmin();
+}
+
+async function ensureAdminSession() {
+  const response = await fetch("/api/admin/session", { headers: { Accept: "application/json" } });
+  const payload = await response.json().catch(() => ({}));
+  if (!payload.authenticated) {
+    window.location.replace("/login.html");
+    throw new Error("admin_auth_required");
+  }
 }
 
 async function refreshAdmin() {
@@ -33,6 +50,7 @@ async function refreshAdmin() {
 
   const payload = await response.json();
   adminState.updatedAt = payload.updatedAt || "";
+  adminState.codes = payload.codes || [];
   adminState.submissions = payload.submissions || [];
   adminState.rewardFeedback = payload.rewardFeedback || [];
   adminState.feedback = payload.feedback || [];
@@ -59,6 +77,8 @@ function bindAdminTabs() {
 function renderAdmin() {
   document.querySelector("#adminUpdatedAt").textContent = `最近更新 ${formatDateTime(adminState.updatedAt)}`;
 
+  renderCount("#sourceCandidateCount", adminState.sourceDraft.candidates.length);
+  renderCount("#codeCount", adminState.codes.length);
   renderCount("#submissionCount", adminState.submissions.length);
   renderCount("#rewardFeedbackCount", adminState.rewardFeedback.length);
   renderCount("#feedbackCount", adminState.feedback.length);
@@ -80,6 +100,16 @@ function renderTabs() {
 }
 
 function renderActivePanel() {
+  if (adminState.activeTab === "sourceParser") {
+    renderSourceParserPanel();
+    return;
+  }
+
+  if (adminState.activeTab === "codes") {
+    renderCodeManagementPanel();
+    return;
+  }
+
   if (adminState.activeTab === "rewardFeedback") {
     renderRewardFeedbackPanel();
     return;
@@ -91,6 +121,61 @@ function renderActivePanel() {
   }
 
   renderSubmissionPanel();
+}
+
+function renderSourceParserPanel() {
+  adminPanel.innerHTML = `
+    <section class="admin-page" aria-label="采集导入">
+      ${renderPanelHeader("采集导入", "在本机运行 Codex 采集 skill，生成候选 JSON 后在此直接导入上架。")}
+      <form class="source-parser-form" id="sourceImportForm">
+        <label class="field-label" for="sourceImportInput">候选文件</label>
+        <input class="field-input import-file-input" id="sourceImportInput" name="sourceImport" type="file" accept="application/json,.json" required />
+        <p class="import-file-name">${adminState.sourceDraft.importFileName ? `已选择：${escapeHtml(adminState.sourceDraft.importFileName)}` : "只接受 Codex skill 生成的 JSON 文件。"}</p>
+        <div class="source-actions">
+          <button class="admin-action-button source-primary-action" type="submit">读取候选</button>
+          <button class="admin-action-button" type="button" data-source-action="publish" ${getNewSourceCandidates().length ? "" : "disabled"}>直接上架</button>
+        </div>
+      </form>
+      ${renderSourceCandidateTable()}
+    </section>
+  `;
+}
+
+function renderCodeManagementPanel() {
+  adminPanel.innerHTML = `
+    <section class="admin-page" aria-label="兑换码管理">
+      ${renderPanelHeader("兑换码管理", "查看当前兑换码库存，支持手动下架和恢复。已下架内容不会在前台展示。")}
+      <div class="admin-table-wrap">
+        <table class="admin-table is-codes">
+          <colgroup>
+            <col class="col-status" />
+            <col class="col-code" />
+            <col class="col-title" />
+            <col class="col-reward" />
+            <col class="col-expire" />
+            <col class="col-source" />
+            <col class="col-updated" />
+            <col class="col-actions" />
+          </colgroup>
+          <thead>
+            <tr>
+              <th>状态</th>
+              <th>兑换码</th>
+              <th>名称</th>
+              <th>奖励</th>
+              <th>有效期</th>
+              <th>来源</th>
+              <th>更新时间</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${renderRows(adminState.codes, renderCodeRow, 8)}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  `;
 }
 
 function renderSubmissionPanel() {
@@ -209,6 +294,152 @@ function renderRows(items, renderer, colspan) {
   return items.map(renderer).join("");
 }
 
+function renderCrawlPageSummary() {
+  const pages = adminState.sourceDraft.crawlPages || [];
+  if (!pages.length) {
+    return "";
+  }
+
+  return `
+    <div class="crawl-summary">
+      <h3>爬取结果</h3>
+      <div class="crawl-page-list">
+        ${pages.map(renderCrawlPageItem).join("")}
+      </div>
+    </div>
+  `;
+}
+
+function renderCrawlPageItem(page) {
+  const isFetched = page.status === "fetched";
+  const statusText = isFetched ? `已抓取，候选 ${page.candidateCount || 0}` : "抓取失败";
+  const statusClass = isFetched ? "is-approved" : "is-rejected";
+
+  return `
+    <div class="crawl-page-item">
+      <span class="admin-status ${statusClass}">${escapeHtml(statusText)}</span>
+      <a class="admin-source-link" href="${escapeAttr(page.url)}" title="${escapeAttr(page.url)}" target="_blank" rel="noreferrer noopener">
+        ${escapeHtml(page.url)}
+      </a>
+    </div>
+  `;
+}
+
+function renderSourceCandidateTable() {
+  if (!adminState.sourceDraft.parsed) {
+    return '<div class="source-empty-state">请选择 Codex skill 生成的候选文件</div>';
+  }
+
+  return `
+    <div class="admin-table-wrap source-candidate-wrap">
+      <table class="admin-table is-source-candidates">
+        <colgroup>
+          <col class="col-status" />
+          <col class="col-code" />
+          <col class="col-title" />
+          <col class="col-reward" />
+          <col class="col-expire" />
+          <col class="col-confidence" />
+        </colgroup>
+        <thead>
+          <tr>
+            <th>状态</th>
+            <th>兑换码</th>
+            <th>名称</th>
+            <th>奖励</th>
+            <th>有效期</th>
+            <th>置信度</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${renderRows(adminState.sourceDraft.candidates, renderSourceCandidateRow, 6)}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+function renderSourceCandidateRow(item) {
+  return `
+    <tr>
+      <td>${renderCandidateDuplicateStatus(item.duplicateStatus)}</td>
+      <td><span class="admin-code">${escapeHtml(item.code)}</span></td>
+      <td>${escapeHtml(item.title)}</td>
+      <td>${escapeHtml(item.reward || "奖励待确认")}</td>
+      <td>${escapeHtml(formatDate(item.expireAt))}</td>
+      <td>${escapeHtml(formatConfidence(item.confidence))}</td>
+    </tr>
+  `;
+}
+
+function renderCandidateDuplicateStatus(status) {
+  const className = status === "new" ? "is-approved" : status === "existing" ? "is-rejected" : "is-pending";
+  return `<span class="admin-status ${className}">${escapeHtml(formatDuplicateStatus(status))}</span>`;
+}
+
+function formatDuplicateStatus(status) {
+  if (status === "existing") {
+    return "已上架";
+  }
+
+  if (status === "pending") {
+    return "审核中";
+  }
+
+  return "新候选";
+}
+
+function renderCodeRow(item) {
+  return `
+    <tr>
+      <td>${renderCodeVisibility(item)}</td>
+      <td><span class="admin-code">${escapeHtml(item.code)}</span></td>
+      <td>${escapeHtml(item.title || "未填写名称")}</td>
+      <td>${escapeHtml(item.reward || "奖励待确认")}</td>
+      <td>${escapeHtml(formatCodeExpire(item.expireAt))}</td>
+      <td>${renderSource(item.sourceUrl)}</td>
+      <td>${escapeHtml(formatDateTime(item.updatedAt || item.firstSeenAt))}</td>
+      <td>${renderCodeActions(item)}</td>
+    </tr>
+  `;
+}
+
+function renderCodeVisibility(item) {
+  if (item.visible === false) {
+    return `<span class="admin-status is-rejected" title="${escapeAttr(item.hiddenReason || "")}">已下架</span>`;
+  }
+
+  if (isCodeExpired(item)) {
+    return '<span class="admin-status is-pending">已过期</span>';
+  }
+
+  return '<span class="admin-status is-approved">展示中</span>';
+}
+
+function renderCodeActions(item) {
+  if (item.visible !== false && isCodeExpired(item)) {
+    return '<span class="admin-action-placeholder">-</span>';
+  }
+
+  const action = item.visible === false ? "restore" : "takedown";
+  const label = item.visible === false ? "恢复" : "下架";
+  const dangerClass = item.visible === false ? "" : " danger";
+
+  return `
+    <div class="admin-actions">
+      <button class="admin-action-button${dangerClass}" type="button" data-code-action="${escapeAttr(action)}" data-code="${escapeAttr(item.code)}">${escapeHtml(label)}</button>
+    </div>
+  `;
+}
+
+function formatConfidence(confidence) {
+  return confidence === "high" ? "高" : "中";
+}
+
+function getNewSourceCandidates() {
+  return adminState.sourceDraft.candidates.filter((item) => item.duplicateStatus === "new");
+}
+
 function renderSubmissionRow(item) {
   return `
     <tr>
@@ -323,6 +554,21 @@ function bindAdminActions() {
       submitReview(button.dataset.reviewType, button.dataset.reviewId, button.dataset.reviewDecision);
     });
   });
+
+  document.querySelector("#sourceImportForm")?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    previewImportedCandidates();
+  });
+
+  document.querySelector('[data-source-action="publish"]')?.addEventListener("click", publishSourceCandidates);
+
+  document.querySelectorAll("[data-code-action]").forEach((button) => {
+    button.addEventListener("click", () => {
+      submitCodeAction(button.dataset.code, button.dataset.codeAction);
+    });
+  });
+
+  document.querySelector('[data-admin-action="logout"]')?.addEventListener("click", logoutAdmin);
 }
 
 async function submitReview(type, id, decision) {
@@ -352,6 +598,120 @@ function getReviewErrorMessage(error) {
   return "审核失败，请稍后再试";
 }
 
+async function previewImportedCandidates() {
+  try {
+    const candidates = await readImportCandidates();
+    const payload = await postJson("/api/admin/import-preview", { candidates });
+    adminState.sourceDraft.candidates = payload.candidates || [];
+    adminState.sourceDraft.parsed = true;
+    showToast(adminState.sourceDraft.candidates.length ? "候选读取完成" : "文件内没有可导入兑换码");
+    renderAdmin();
+  } catch (error) {
+    showToast(getSourceErrorMessage(error.message));
+  }
+}
+
+async function publishSourceCandidates() {
+  const codes = getNewSourceCandidates().map((item) => item.code);
+  if (!codes.length) {
+    showToast("没有可直接上架的新候选");
+    return;
+  }
+
+  try {
+    const payload = await postJson("/api/admin/import-publish", {
+      codes,
+      candidates: getNewSourceCandidates()
+    });
+
+    adminState.sourceDraft.candidates = [];
+    adminState.sourceDraft.parsed = false;
+    adminState.activeTab = "codes";
+    window.location.hash = "codes";
+    showToast(`已上架 ${payload.created?.length || 0} 条兑换码`);
+    await refreshAdmin();
+  } catch (error) {
+    showToast(getSourceErrorMessage(error.message));
+  }
+}
+
+async function readImportCandidates() {
+  const input = document.querySelector("#sourceImportInput");
+  const file = input?.files?.[0];
+  if (!file) {
+    throw new Error("missing_import_file");
+  }
+
+  if (file.size > 60000) {
+    throw new Error("import_file_too_large");
+  }
+
+  const parsed = JSON.parse(await file.text());
+  const candidates = Array.isArray(parsed?.candidates) ? parsed.candidates : null;
+  if (!candidates) {
+    throw new Error("invalid_import_file");
+  }
+
+  adminState.sourceDraft.importFile = file;
+  adminState.sourceDraft.importFileName = file.name;
+  return candidates;
+}
+
+async function logoutAdmin() {
+  try {
+    await postJson("/api/admin/logout", {});
+  } finally {
+    window.location.replace("/login.html");
+  }
+}
+
+async function submitCodeAction(code, action) {
+  if (!code || !["takedown", "restore"].includes(action)) {
+    return;
+  }
+
+  try {
+    await postJson(`/api/admin/gift-codes/${encodeURIComponent(code)}/${action}`, {});
+    showToast(action === "restore" ? "已恢复展示" : "已下架");
+    await refreshAdmin();
+  } catch (error) {
+    showToast(getCodeActionErrorMessage(error.message));
+  }
+}
+
+function getCodeActionErrorMessage(error) {
+  if (error === "code_not_found") {
+    return "兑换码不存在";
+  }
+
+  return "操作失败，请稍后再试";
+}
+
+function getSourceErrorMessage(error) {
+  if (error === "missing_import_file") {
+    return "请选择 Codex skill 生成的候选 JSON 文件";
+  }
+
+  if (error === "invalid_import_file" || error === "invalid_import_candidates") {
+    return "候选文件格式不正确或没有有效候选";
+  }
+
+  if (error === "import_file_too_large" || error === "request_body_too_large") {
+    return "候选文件过大，请拆分后再导入";
+  }
+
+  if (error === "source_candidates_empty") {
+    return "没有可直接上架的新候选";
+  }
+
+  if (error === "admin_auth_required") {
+    window.location.replace("/login.html");
+    return "登录已失效";
+  }
+
+  return "导入失败，请检查候选文件后重试";
+}
+
 async function postJson(url, body) {
   const response = await fetch(url, {
     method: "POST",
@@ -364,6 +724,9 @@ async function postJson(url, body) {
 
   if (!response.ok) {
     const payload = await response.json().catch(() => ({}));
+    if (response.status === 401) {
+      window.location.replace("/login.html");
+    }
     throw new Error(payload.error || "request_failed");
   }
 
@@ -402,6 +765,27 @@ function formatDate(value) {
     month: "2-digit",
     day: "2-digit"
   }).format(date);
+}
+
+function formatCodeExpire(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "待确认";
+  }
+
+  return new Intl.DateTimeFormat("zh-CN", {
+    timeZone: "Asia/Shanghai",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit"
+  }).format(date);
+}
+
+function isCodeExpired(item) {
+  const date = new Date(item.expireAt);
+  return !Number.isNaN(date.getTime()) && date.getTime() < Date.now();
 }
 
 function showToast(message) {

@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>心动小镇兑换码后台</title>
-    <meta name="description" content="心动小镇兑换码聚合工具本地审核后台。" />
+    <meta name="description" content="心动小镇兑换码聚合工具管理后台。" />
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
@@ -16,9 +16,18 @@
             <span id="adminUpdatedAt">加载中</span>
           </p>
         </div>
+        <button class="admin-action-button" type="button" data-admin-action="logout">退出登录</button>
       </header>
 
       <nav class="admin-tabs" aria-label="审核类型">
+        <button class="admin-tab" type="button" data-admin-tab="sourceParser">
+          <span>采集导入</span>
+          <span class="admin-count" id="sourceCandidateCount">0</span>
+        </button>
+        <button class="admin-tab" type="button" data-admin-tab="codes">
+          <span>兑换码管理</span>
+          <span class="admin-count" id="codeCount">0</span>
+        </button>
         <button class="admin-tab" type="button" data-admin-tab="submissions">
           <span>新兑换码</span>
           <span class="admin-count" id="submissionCount">0</span>

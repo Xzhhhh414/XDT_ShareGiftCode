@@ -1,0 +1,4 @@
+interface:
+  display_name: "采集兑换码"
+  short_description: "按发布日期范围采集公开帖子并生成后台候选导入文件工具"
+  default_prompt: "采集指定日期范围内的公开兑换码帖子，生成后台可导入的候选文件。"
