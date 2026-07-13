@@ -150,6 +150,8 @@ GitHub Release 包要求：
 
 玩家 Release 包由 `npm run package:taptap` 生成。构建时必须提供 `TAPTAP_API_BASE_URL=https://服务器域名`，脚本会输出只包含玩家前端的 `dist/xdt-share-gift-code.zip`；该地址不含 `/api`，玩家脚本会自动请求其 `/api/*` 路径。服务端正式运行时设置 `SERVE_PLAYER_STATIC=false`，禁止同机继续公开玩家静态页面，并用 `PLAYER_CORS_ORIGINS` 仅允许实际 TapTap 工具托管域名跨域访问。
 
+服务器部署以 systemd 管理 Node 服务：服务使用 `xdtgift` 系统用户、仅监听 `127.0.0.1:4173`，SQLite 状态目录为 `/var/lib/xdt-share-gift-code`。备案审核期间可以完成 Node 24 安装、代码拉取、SQLite 初始化和本机回环接口验证；备案通过后才安装 Caddy、开放 `80/443` 并申请 HTTPS 证书。
+
 ## 阶段计划
 
 ### Phase 1：静态 MVP（已完成）

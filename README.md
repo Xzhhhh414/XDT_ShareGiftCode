@@ -206,6 +206,8 @@ SQLITE_DB_PATH=/var/lib/xdt-share-gift-code/db.sqlite
 
 首次以 `DATA_STORE=sqlite` 启动时，服务会优先导入已有的 `server/db.json`；文件不存在时导入 `server/db.seed.json`。后续所有读写都进入 SQLite 的 WAL 数据库，原始 JSON 不再参与运行时写入。
 
+服务器运行配置、备案审核期间的本机回环部署、SQLite 数据迁移和备案通过后的 Caddy 启用步骤见 [deploy/README.md](deploy/README.md)。
+
 本地后台页面：
 
 ```text

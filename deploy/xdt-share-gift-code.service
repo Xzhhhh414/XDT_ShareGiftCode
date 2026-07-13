@@ -1,0 +1,25 @@
+[Unit]
+Description=XDT Share Gift Code API
+After=network.target
+
+[Service]
+Type=simple
+User=xdtgift
+Group=xdtgift
+WorkingDirectory=/opt/xdt-share-gift-code
+EnvironmentFile=/etc/xdt-share-gift-code.env
+Environment=NODE_ENV=production
+Environment=PORT=4173
+Environment=DATA_STORE=sqlite
+Environment=SQLITE_DB_PATH=/var/lib/xdt-share-gift-code/db.sqlite
+Environment=SERVE_PLAYER_STATIC=false
+ExecStart=/usr/bin/node server.js
+Restart=on-failure
+RestartSec=5
+StateDirectory=xdt-share-gift-code
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
