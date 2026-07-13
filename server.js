@@ -1,13 +1,17 @@
 const http = require("node:http");
 const fs = require("node:fs/promises");
+const fsSync = require("node:fs");
 const path = require("node:path");
 const crypto = require("node:crypto");
+const { DatabaseSync } = require("node:sqlite");
 
 const PORT = Number(process.env.PORT || 4173);
 const ROOT_DIR = __dirname;
 const SERVER_DIR = path.join(ROOT_DIR, "server");
 const DB_PATH = path.join(SERVER_DIR, "db.json");
 const SEED_PATH = path.join(SERVER_DIR, "db.seed.json");
+const DATA_STORE = process.env.DATA_STORE || "json";
+const SQLITE_DB_PATH = process.env.SQLITE_DB_PATH || path.join(SERVER_DIR, "db.sqlite");
 const MAX_BODY_BYTES = 64000;
 const MAX_IMPORT_CANDIDATES = 50;
 const PENDING_REWARD_TEXT = "奖励待确认";
@@ -16,8 +20,20 @@ const ADMIN_SESSION_SECRET = crypto.createHash("sha256").update(`xdt-share-gift-
 const ADMIN_SESSION_TTL_SECONDS = 12 * 60 * 60;
 const LOGIN_MAX_ATTEMPTS = 5;
 const LOGIN_WINDOW_MS = 15 * 60 * 1000;
+const SERVE_PLAYER_STATIC = process.env.SERVE_PLAYER_STATIC !== "false";
+const PLAYER_CORS_ORIGINS = new Set(
+  String(process.env.PLAYER_CORS_ORIGINS || "")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean)
+);
 const loginAttempts = new Map();
 let dbMutationQueue = Promise.resolve();
+let sqliteDatabase = null;
+
+if (!["json", "sqlite"].includes(DATA_STORE)) {
+  throw new Error("DATA_STORE must be json or sqlite.");
+}
 
 const MIME_TYPES = {
   ".css": "text/css; charset=utf-8",
@@ -58,6 +74,15 @@ server.listen(PORT, () => {
 });
 
 async function handleApi(request, response, url) {
+  if (isPlayerApiPath(url.pathname)) {
+    if (request.method === "OPTIONS") {
+      handlePlayerCorsPreflight(request, response);
+      return;
+    }
+
+    applyPlayerCors(request, response);
+  }
+
   if (request.method === "GET" && url.pathname === "/api/health") {
     sendJson(response, 200, { ok: true });
     return;
@@ -606,20 +631,62 @@ async function serveStatic(response, pathname) {
 }
 
 function isPublicPath(requestPath) {
-  return (
+  const playerPaths =
     requestPath === "/index.html" ||
-    requestPath === "/login.html" ||
-    requestPath === "/admin.html" ||
     requestPath === "/styles.css" ||
     requestPath === "/script.js" ||
+    requestPath === "/runtime-config.js" ||
+    requestPath.startsWith("/data/") ||
+    requestPath.startsWith("/assets/");
+
+  return (
+    requestPath === "/login.html" ||
+    requestPath === "/admin.html" ||
     requestPath === "/admin.js" ||
     requestPath === "/login.js" ||
-    requestPath.startsWith("/data/") ||
-    requestPath.startsWith("/assets/")
+    requestPath === "/styles.css" ||
+    (SERVE_PLAYER_STATIC && playerPaths)
   );
 }
 
+function isPlayerApiPath(pathname) {
+  return (
+    pathname === "/api/gift-codes" ||
+    pathname === "/api/submissions" ||
+    /^\/api\/gift-codes\/[^/]+\/(feedback|reward-feedback)$/.test(pathname)
+  );
+}
+
+function applyPlayerCors(request, response) {
+  const origin = String(request.headers.origin || "").trim();
+  if (!origin || !PLAYER_CORS_ORIGINS.has(origin)) {
+    return false;
+  }
+
+  response.setHeader("Access-Control-Allow-Origin", origin);
+  response.setHeader("Vary", "Origin");
+  return true;
+}
+
+function handlePlayerCorsPreflight(request, response) {
+  if (!applyPlayerCors(request, response)) {
+    sendJson(response, 403, { error: "cors_origin_not_allowed" });
+    return;
+  }
+
+  response.writeHead(204, {
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Accept",
+    "Access-Control-Max-Age": "600"
+  });
+  response.end();
+}
+
 async function readDb() {
+  if (DATA_STORE === "sqlite") {
+    return readSqliteDb();
+  }
+
   await fs.mkdir(SERVER_DIR, { recursive: true });
 
   try {
@@ -636,7 +703,72 @@ async function readDb() {
 }
 
 async function writeDb(db) {
+  if (DATA_STORE === "sqlite") {
+    writeSqliteDb(db);
+    return;
+  }
+
   await fs.writeFile(DB_PATH, `${JSON.stringify(db, null, 2)}\n`);
+}
+
+function readSqliteDb() {
+  const row = getSqliteDatabase()
+    .prepare("SELECT payload FROM app_state WHERE id = 1")
+    .get();
+
+  if (!row?.payload) {
+    throw new Error("SQLite app state is missing.");
+  }
+
+  return JSON.parse(row.payload);
+}
+
+function writeSqliteDb(db) {
+  getSqliteDatabase()
+    .prepare("UPDATE app_state SET payload = ?, updated_at = ? WHERE id = 1")
+    .run(JSON.stringify(db), new Date().toISOString());
+}
+
+function getSqliteDatabase() {
+  if (sqliteDatabase) {
+    return sqliteDatabase;
+  }
+
+  fsSync.mkdirSync(path.dirname(SQLITE_DB_PATH), { recursive: true });
+  sqliteDatabase = new DatabaseSync(SQLITE_DB_PATH);
+  sqliteDatabase.exec(`
+    PRAGMA journal_mode = WAL;
+    PRAGMA synchronous = FULL;
+    CREATE TABLE IF NOT EXISTS app_state (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      payload TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+  `);
+
+  const existing = sqliteDatabase
+    .prepare("SELECT id FROM app_state WHERE id = 1")
+    .get();
+  if (!existing) {
+    const initialState = readInitialDbState();
+    sqliteDatabase
+      .prepare("INSERT INTO app_state (id, payload, updated_at) VALUES (1, ?, ?)")
+      .run(JSON.stringify(initialState), new Date().toISOString());
+  }
+
+  return sqliteDatabase;
+}
+
+function readInitialDbState() {
+  try {
+    return JSON.parse(fsSync.readFileSync(DB_PATH, "utf8"));
+  } catch (error) {
+    if (error.code !== "ENOENT") {
+      throw error;
+    }
+  }
+
+  return JSON.parse(fsSync.readFileSync(SEED_PATH, "utf8"));
 }
 
 function mutateDb(mutator) {

@@ -21,6 +21,7 @@ const submissionSourceInput = document.querySelector("#submissionSourceInput");
 const rewardModal = document.querySelector("#rewardModal");
 const rewardForm = document.querySelector("#rewardForm");
 const rewardInput = document.querySelector("#rewardInput");
+const apiBaseUrl = normalizeApiBaseUrl(window.XDT_GIFT_CODE_CONFIG?.apiBaseUrl);
 
 let activeFeedbackItem = null;
 let activeRewardItem = null;
@@ -36,7 +37,7 @@ async function init() {
 
 async function loadCodes() {
   try {
-    const response = await fetch("/api/gift-codes", {
+    const response = await fetch(apiUrl("/gift-codes"), {
       headers: {
         Accept: "application/json"
       }
@@ -52,6 +53,12 @@ async function loadCodes() {
     state.codes = normalizeCodes(payload.codes || []);
   } catch {
     state.usesServer = false;
+    if (apiBaseUrl) {
+      state.updatedAt = "";
+      state.codes = [];
+      emptyState.querySelector("p").textContent = "兑换码暂时无法加载，请稍后重试";
+      return;
+    }
     state.updatedAt = window.GIFT_CODE_DATA?.updatedAt || "";
     state.codes = normalizeCodes(window.GIFT_CODE_DATA?.codes || []);
   }
@@ -268,7 +275,7 @@ async function submitCodeSubmission() {
   }
 
   try {
-    await postJson("/api/submissions", {
+    await postJson(apiUrl("/submissions"), {
       title,
       code,
       reward,
@@ -381,7 +388,7 @@ async function submitRewardFeedback() {
 
   if (state.usesServer) {
     try {
-      const payload = await postJson(`/api/gift-codes/${encodeURIComponent(activeRewardItem.code)}/reward-feedback`, {
+      const payload = await postJson(apiUrl(`/gift-codes/${encodeURIComponent(activeRewardItem.code)}/reward-feedback`), {
         reward,
         clientId: state.clientId
       });
@@ -446,7 +453,7 @@ function writeClipboard(text) {
 async function voteCode(item, vote) {
   if (state.usesServer) {
     try {
-      const payload = await postJson(`/api/gift-codes/${encodeURIComponent(item.code)}/feedback`, {
+      const payload = await postJson(apiUrl(`/gift-codes/${encodeURIComponent(item.code)}/feedback`), {
         result: vote,
         clientId: state.clientId
       });
@@ -718,6 +725,24 @@ function readJson(key, fallback) {
 
 function writeJson(key, value) {
   localStorage.setItem(key, JSON.stringify(value));
+}
+
+function normalizeApiBaseUrl(value) {
+  const normalized = String(value || "").trim().replace(/\/+$/, "");
+  if (!normalized) {
+    return "";
+  }
+
+  try {
+    const url = new URL(normalized);
+    return url.protocol === "https:" || url.protocol === "http:" ? normalized : "";
+  } catch {
+    return "";
+  }
+}
+
+function apiUrl(pathname) {
+  return apiBaseUrl ? `${apiBaseUrl}/api${pathname}` : `/api${pathname}`;
 }
 
 async function postJson(url, body) {

@@ -47,6 +47,7 @@
 - 腾讯云服务器只承载公开 HTTPS API、兑换码数据和受保护的管理后台；不承载玩家工具的静态页面。
 - 玩家工具调用 API 时使用可配置的绝对 HTTPS 地址，服务器仅对白名单中的 TapTap 工具域名开放跨域访问；后台与 API 保持同域。
 - Release ZIP 必须是构建产物而非源码，解压后目录含 `index.html`，且资源使用相对路径。
+- 初期生产数据使用 SQLite 替换本地 JSON 文件，数据库文件不对公网开放；服务器内存不足或并发需求增长后再迁移到独立数据库服务。
 
 ### 前台状态
 
@@ -168,6 +169,42 @@ POST /api/admin/reward-feedback/:id/review
 API 会对非法反馈值、非法奖励内容、错误 JSON 和过大的请求体返回明确错误，不把请求错误当成服务内部错误。
 
 前端优先读取 `/api/gift-codes`。如果 API 不可用，则回退到 `data/codes.js`，保持直接打开 `index.html` 时仍可查看静态页面。
+
+### TapTap Release 包
+
+本地调试仍使用根目录的 `index.html` 和同源 API。发布到 TapTap 时，不上传后台、服务端源码或运行时数据，而是生成单独的玩家工具 ZIP：
+
+```powershell
+# 仅生成目录，用于检查构建产物
+npm run build:taptap
+
+# 域名和 HTTPS API 就绪后，生成可上传到 GitHub Release 的 ZIP
+$env:TAPTAP_API_BASE_URL = "https://code.example.cn"
+npm run package:taptap
+```
+
+输出文件是 `dist/xdt-share-gift-code.zip`。ZIP 内只包含一个 `xdt-share-gift-code` 目录，目录内含 `index.html`、玩家脚本、样式、资源和运行时 API 配置。将该 ZIP 作为公开 GitHub Release 的附件，再从 TapTap 第三方工具页面选择对应 Release。
+
+`TAPTAP_API_BASE_URL` 是服务器域名根地址，不包含 `/api`。例如 `https://code.example.cn` 会让玩家工具请求 `https://code.example.cn/api/gift-codes`。
+
+服务器正式启动时使用：
+
+```text
+SERVE_PLAYER_STATIC=false
+PLAYER_CORS_ORIGINS=https://实际的TapTap工具托管域名
+ADMIN_PASSWORD=管理员密码
+```
+
+`PLAYER_CORS_ORIGINS` 只填写实际工具页面的 Origin，多个域名以英文逗号分隔；不能使用 `*`。管理员后台与 API 同域，不需要加入此变量。
+
+生产服务使用 SQLite 时再设置：
+
+```text
+DATA_STORE=sqlite
+SQLITE_DB_PATH=/var/lib/xdt-share-gift-code/db.sqlite
+```
+
+首次以 `DATA_STORE=sqlite` 启动时，服务会优先导入已有的 `server/db.json`；文件不存在时导入 `server/db.seed.json`。后续所有读写都进入 SQLite 的 WAL 数据库，原始 JSON 不再参与运行时写入。
 
 本地后台页面：
 

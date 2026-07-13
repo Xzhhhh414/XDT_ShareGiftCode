@@ -13,4 +13,7 @@ coverage/
 
 *.log
 server/db.json
+server/db.sqlite
+server/db.sqlite-shm
+server/db.sqlite-wal
 docs/imports/
