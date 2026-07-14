@@ -6,6 +6,7 @@ const crypto = require("node:crypto");
 const { DatabaseSync } = require("node:sqlite");
 
 const PORT = Number(process.env.PORT || 4173);
+const HOST = process.env.HOST || "127.0.0.1";
 const ROOT_DIR = __dirname;
 const SERVER_DIR = path.join(ROOT_DIR, "server");
 const DB_PATH = path.join(SERVER_DIR, "db.json");
@@ -69,8 +70,8 @@ const server = http.createServer(async (request, response) => {
   }
 });
 
-server.listen(PORT, () => {
-  console.log(`XDT Share Gift Code running at http://localhost:${PORT}`);
+server.listen(PORT, HOST, () => {
+  console.log(`XDT Share Gift Code running at http://${HOST}:${PORT}`);
 });
 
 async function handleApi(request, response, url) {

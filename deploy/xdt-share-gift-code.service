@@ -10,6 +10,7 @@ WorkingDirectory=/opt/xdt-share-gift-code
 EnvironmentFile=/etc/xdt-share-gift-code.env
 Environment=NODE_ENV=production
 Environment=PORT=4173
+Environment=HOST=127.0.0.1
 Environment=DATA_STORE=sqlite
 Environment=SQLITE_DB_PATH=/var/lib/xdt-share-gift-code/db.sqlite
 Environment=SERVE_PLAYER_STATIC=false

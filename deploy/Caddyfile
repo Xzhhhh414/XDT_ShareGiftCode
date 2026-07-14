@@ -1,4 +1,13 @@
-code.xdtgift.site {
+# The Let's Encrypt IP certificate is installed and renewed by acme.sh.
+# Caddy's built-in automatic HTTPS creates an untrusted local certificate for
+# IP addresses, so always use the explicitly installed public certificate.
+{
+  # IP-address clients normally omit TLS SNI. Select this certificate for them.
+  default_sni 124.222.121.67
+}
+
+https://124.222.121.67 {
+  tls /etc/caddy/certs/124.222.121.67.fullchain.crt /etc/caddy/certs/124.222.121.67.key
   encode zstd gzip
   reverse_proxy 127.0.0.1:4173
 }
