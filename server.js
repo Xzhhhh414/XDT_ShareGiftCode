@@ -173,7 +173,7 @@ async function handleApi(request, response, url) {
 }
 
 async function createFeedback(response, rawCode, body) {
-  const code = normalizeCode(rawCode);
+  const code = normalizeCode(decodeRouteCode(rawCode));
   const result = String(body.result || "").trim();
 
   if (!["valid", "invalid"].includes(result)) {
@@ -182,22 +182,33 @@ async function createFeedback(response, rawCode, body) {
   }
 
   const payload = await mutateDb(async (db) => {
-    if (!findCode(db, code)) {
+    const codeItem = findCode(db, code);
+    if (!codeItem) {
       throw new ApiError(404, "code_not_found");
     }
 
+    const createdAt = new Date().toISOString();
     const feedback = {
       code,
       result,
-      createdAt: new Date().toISOString(),
+      createdAt,
       clientId: getClientId(body)
     };
 
     db.feedback = [...(db.feedback || []), feedback];
-    db.updatedAt = feedback.createdAt;
+
+    if (result === "invalid" && !codeItem.expireAt && codeItem.visible !== false) {
+      codeItem.visible = false;
+      codeItem.hiddenAt = createdAt;
+      codeItem.hiddenReason = "玩家反馈失效";
+      codeItem.updatedAt = createdAt;
+    }
+
+    db.updatedAt = createdAt;
 
     return {
       latestFeedback: toClientFeedback(feedback),
+      visible: codeItem.visible !== false,
       updatedAt: db.updatedAt
     };
   });
@@ -206,7 +217,7 @@ async function createFeedback(response, rawCode, body) {
 }
 
 async function createRewardFeedback(response, rawCode, body) {
-  const code = normalizeCode(rawCode);
+  const code = normalizeCode(decodeRouteCode(rawCode));
   const reward = String(body.reward || "").trim().replace(/\s+/g, " ");
 
   if (!reward || reward.length > 80) {
@@ -354,7 +365,7 @@ async function publishImportedCandidates(response, body) {
 }
 
 async function updateCodeVisibility(response, rawCode, action, body) {
-  const codeValue = normalizeCode(rawCode);
+  const codeValue = normalizeCode(decodeRouteCode(rawCode));
 
   const payload = await mutateDb(async (db) => {
     const code = findCode(db, codeValue);
@@ -964,6 +975,14 @@ function toAdminCode(code) {
 
 function normalizeCode(code) {
   return String(code || "").trim().toLowerCase();
+}
+
+function decodeRouteCode(rawCode) {
+  try {
+    return decodeURIComponent(rawCode);
+  } catch {
+    throw new ApiError(400, "invalid_code");
+  }
 }
 
 function normalizeSubmittedCode(code) {

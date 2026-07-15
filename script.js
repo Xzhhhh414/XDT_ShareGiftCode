@@ -458,9 +458,10 @@ async function voteCode(item, vote) {
         clientId: state.clientId
       });
       item.latestFeedback = payload.latestFeedback;
+      item.visible = payload.visible !== false;
       state.updatedAt = payload.updatedAt || state.updatedAt;
       item.computedStatus = computeStatus(item);
-      showToast(vote === "valid" ? "已提交可用反馈" : "已提交失效反馈");
+      showToast(vote === "valid" ? "已提交可用反馈" : "已提交失效反馈，礼包码已下架");
       renderUpdatedAt();
       renderList();
     } catch {
@@ -475,7 +476,10 @@ async function voteCode(item, vote) {
     votedAt: new Date().toISOString()
   };
   writeJson("xdt-gift-code-feedback", state.feedback);
-  showToast(vote === "valid" ? "已记录可用反馈" : "已记录失效反馈");
+  if (vote === "invalid" && !parseDate(item.expireAt)) {
+    item.visible = false;
+  }
+  showToast(vote === "valid" ? "已记录可用反馈" : "已记录失效反馈，礼包码已下架");
   item.computedStatus = computeStatus(item);
   renderList();
 }
