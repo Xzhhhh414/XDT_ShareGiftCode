@@ -89,7 +89,7 @@ systemctl enable --now caddy
 ```
 
 6. 使用 `curl -v https://124.222.121.67/api/health` 与浏览器检查证书；只有两者均成功且浏览器无证书警告时，才继续。
-7. 在 TapTap 测试工具页确认实际页面 Origin 后，将其填入 `/etc/xdt-share-gift-code.env` 的 `PLAYER_CORS_ORIGINS`，再执行 `systemctl restart xdt-share-gift-code`。
+7. 在 TapTap 测试工具页确认实际页面 Origin 后，将其填入 `/etc/xdt-share-gift-code.env` 的 `PLAYER_CORS_ORIGINS`，再执行 `systemctl restart xdt-share-gift-code`。2026-07-15 当前工具实际运行于 `https://3rd-tool-h5-al.tapimg.com`，不是详情页地址 `https://www.taptap.cn`。
 8. 设置 `TAPTAP_API_BASE_URL=https://124.222.121.67`，运行 `npm run package:taptap` 生成 GitHub Release ZIP。
 
 如果 Caddy 无法取得受信任的 IP 地址证书，或 TapTap 的 CSP 拒绝连接 IP 地址，

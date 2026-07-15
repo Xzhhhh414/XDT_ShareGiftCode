@@ -191,11 +191,11 @@ npm run package:taptap
 
 ```text
 SERVE_PLAYER_STATIC=false
-PLAYER_CORS_ORIGINS=https://实际的TapTap工具托管域名
+PLAYER_CORS_ORIGINS=https://3rd-tool-h5-al.tapimg.com
 ADMIN_PASSWORD=管理员密码
 ```
 
-`PLAYER_CORS_ORIGINS` 只填写实际工具页面的 Origin，多个域名以英文逗号分隔；不能使用 `*`。管理员后台与 API 同域，不需要加入此变量。
+`PLAYER_CORS_ORIGINS` 只填写实际工具页面的 Origin，多个域名以英文逗号分隔；不能使用 `*`。2026-07-15 当前工具的实际 Origin 为 `https://3rd-tool-h5-al.tapimg.com`，不能误填工具详情页地址 `https://www.taptap.cn`。管理员后台与 API 同域，不需要加入此变量。
 
 生产服务使用 SQLite 时再设置：
 
