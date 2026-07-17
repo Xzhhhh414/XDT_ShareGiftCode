@@ -425,16 +425,16 @@ function renderCodeRow(item) {
 }
 
 function renderCodeVisibility(item) {
-  if (item.visible !== false && isCodePendingConfirmation(item)) {
-    return '<span class="admin-status is-pending">待确认</span>';
-  }
-
   if (item.visible === false) {
     return `<span class="admin-status is-rejected" title="${escapeAttr(item.hiddenReason || "")}">已下架</span>`;
   }
 
   if (isCodeExpired(item)) {
     return '<span class="admin-status is-pending">已过期</span>';
+  }
+
+  if (isCodePendingConfirmation(item)) {
+    return '<span class="admin-status is-pending">待确认</span>';
   }
 
   return '<span class="admin-status is-approved">展示中</span>';

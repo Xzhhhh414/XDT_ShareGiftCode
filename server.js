@@ -1047,19 +1047,19 @@ function sortAdminCodes(a, b) {
 }
 
 function getAdminCodeStatusPriority(code) {
-  if (code.visible !== false && isCodePendingConfirmation(code)) {
-    return 0;
-  }
-
-  if (code.visible !== false && !isCodeExpired(code)) {
-    return 1;
-  }
-
   if (code.visible === false) {
     return 2;
   }
 
-  return 3;
+  if (isCodeExpired(code)) {
+    return 3;
+  }
+
+  if (isCodePendingConfirmation(code)) {
+    return 0;
+  }
+
+  return 1;
 }
 
 function isCodePendingConfirmation(code) {
