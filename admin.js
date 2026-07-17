@@ -23,7 +23,12 @@ const adminMobilePageSelect = document.querySelector("#adminMobilePageSelect");
 const adminDeleteDialog = document.querySelector("#adminDeleteDialog");
 const adminDeleteCode = document.querySelector("#adminDeleteCode");
 const adminDeleteConfirm = document.querySelector("#adminDeleteConfirm");
+const adminRewardDialog = document.querySelector("#adminRewardDialog");
+const adminRewardForm = document.querySelector("#adminRewardForm");
+const adminRewardCode = document.querySelector("#adminRewardCode");
+const adminRewardInput = document.querySelector("#adminRewardInput");
 let pendingDeleteCode = "";
+let pendingRewardCode = "";
 
 initAdmin().catch(() => {
   showToast("后台加载失败，请确认本地服务已启动");
@@ -32,6 +37,7 @@ initAdmin().catch(() => {
 async function initAdmin() {
   bindAdminTabs();
   bindDeleteDialog();
+  bindRewardDialog();
   await ensureAdminSession();
   await refreshAdmin();
 }
@@ -497,7 +503,9 @@ function renderCodeVisibility(item) {
 }
 
 function renderCodeActions(item) {
-  const actions = [];
+  const actions = [
+    `<button class="admin-action-button" type="button" data-code-action="reward" data-code="${escapeAttr(item.code)}">编辑奖励</button>`
+  ];
   if (!(item.visible !== false && isCodeExpired(item))) {
     const action = item.visible === false ? "restore" : "takedown";
     const label = item.visible === false ? "恢复" : "下架";
@@ -686,6 +694,29 @@ function bindDeleteDialog() {
   });
 }
 
+function bindRewardDialog() {
+  adminRewardDialog?.addEventListener("click", (event) => {
+    if (event.target === adminRewardDialog) {
+      adminRewardDialog.close();
+    }
+  });
+
+  document.querySelector('[data-reward-dialog-action="cancel"]')?.addEventListener("click", () => adminRewardDialog.close());
+
+  adminRewardForm?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const code = pendingRewardCode;
+    const reward = adminRewardInput.value;
+    if (!code) {
+      return;
+    }
+
+    pendingRewardCode = "";
+    adminRewardDialog.close();
+    await updateCodeReward(code, reward);
+  });
+}
+
 async function submitReview(type, id, decision) {
   const endpoint =
     type === "submission"
@@ -781,7 +812,13 @@ async function logoutAdmin() {
 }
 
 async function submitCodeAction(code, action) {
-  if (!code || !["takedown", "restore", "delete"].includes(action)) {
+  if (!code || !["takedown", "restore", "delete", "reward"].includes(action)) {
+    return;
+  }
+
+  if (action === "reward") {
+    const item = adminState.codes.find((candidate) => candidate.code === code);
+    openRewardDialog(code, item?.reward || "");
     return;
   }
 
@@ -805,6 +842,34 @@ function openDeleteDialog(code) {
   if (window.confirm(`确定永久删除兑换码“${code}”吗？关联的使用反馈、奖励反馈和历史提交也会被删除，无法恢复。`)) {
     pendingDeleteCode = "";
     performCodeAction(code, "delete");
+  }
+}
+
+function openRewardDialog(code, reward) {
+  pendingRewardCode = code;
+  adminRewardCode.textContent = code;
+  adminRewardInput.value = reward;
+
+  if (typeof adminRewardDialog.showModal === "function") {
+    adminRewardDialog.showModal();
+    adminRewardInput.focus();
+    return;
+  }
+
+  const nextReward = window.prompt(`编辑兑换码“${code}”的奖励内容`, reward);
+  if (nextReward !== null) {
+    pendingRewardCode = "";
+    updateCodeReward(code, nextReward);
+  }
+}
+
+async function updateCodeReward(code, reward) {
+  try {
+    await postJson(`/api/admin/gift-codes/${encodeURIComponent(code)}/reward`, { reward });
+    showToast("奖励已更新");
+    await refreshAdmin();
+  } catch (error) {
+    showToast(getRewardUpdateErrorMessage(error.message));
   }
 }
 
@@ -832,6 +897,14 @@ function getCodeActionErrorMessage(error) {
   }
 
   return "操作失败，请稍后再试";
+}
+
+function getRewardUpdateErrorMessage(error) {
+  if (error === "invalid_reward") {
+    return "奖励内容不能为空，且不能超过 80 个字符";
+  }
+
+  return getCodeActionErrorMessage(error);
 }
 
 function getSourceErrorMessage(error) {

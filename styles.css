@@ -973,6 +973,14 @@ h2 {
   gap: 8px;
 }
 
+.admin-table.is-codes .admin-actions {
+  flex-wrap: wrap;
+}
+
+.admin-table.is-codes .admin-actions .admin-action-button {
+  flex: 1 1 64px;
+}
+
 .admin-action-button {
   flex: 1 1 0;
   min-width: 52px;
@@ -1038,6 +1046,13 @@ h2 {
 .admin-confirm-actions {
   display: flex;
   gap: 8px;
+}
+
+.admin-reward-input {
+  box-sizing: border-box;
+  min-height: 92px;
+  resize: vertical;
+  width: 100%;
 }
 
 .source-parser-form {

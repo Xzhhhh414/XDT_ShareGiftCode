@@ -165,6 +165,12 @@ async function handleApi(request, response, url) {
     return;
   }
 
+  const codeRewardMatch = url.pathname.match(/^\/api\/admin\/gift-codes\/([^/]+)\/reward$/);
+  if (request.method === "POST" && codeRewardMatch) {
+    await updateCodeReward(response, codeRewardMatch[1], await readBody(request));
+    return;
+  }
+
   const deleteCodeMatch = url.pathname.match(/^\/api\/admin\/gift-codes\/([^/]+)$/);
   if (request.method === "DELETE" && deleteCodeMatch) {
     requireFullAdmin(request);
@@ -337,6 +343,36 @@ async function updateCodeVisibility(response, rawCode, action, body) {
       code.restoredAt = updatedAt;
     }
 
+    code.updatedAt = updatedAt;
+    db.updatedAt = updatedAt;
+
+    return {
+      code: toAdminCode(code),
+      updatedAt: db.updatedAt
+    };
+  });
+
+  sendJson(response, 200, payload);
+}
+
+async function updateCodeReward(response, rawCode, body) {
+  const codeValue = normalizeCode(decodeRouteCode(rawCode));
+  const reward = normalizeConfiguredReward(body.reward);
+
+  if (!reward) {
+    sendJson(response, 400, { error: "invalid_reward" });
+    return;
+  }
+
+  const payload = await mutateDb(async (db) => {
+    const code = findCode(db, codeValue);
+    if (!code) {
+      throw new ApiError(404, "code_not_found");
+    }
+
+    const updatedAt = new Date().toISOString();
+    code.reward = reward;
+    code.rewardConfiguredAt = updatedAt;
     code.updatedAt = updatedAt;
     db.updatedAt = updatedAt;
 
@@ -820,7 +856,7 @@ function toAdminPayload(db, role) {
 function toClientCode(db, code) {
   const normalizedCode = normalizeCode(code.code);
   const latestFeedback = getLatestFeedback(db, normalizedCode) || code.latestFeedback || null;
-  const approvedReward = getLatestApprovedReward(db, normalizedCode);
+  const approvedReward = code.rewardConfiguredAt ? null : getLatestApprovedReward(db, normalizedCode);
 
   return {
     ...code,
@@ -869,6 +905,11 @@ function findPendingSubmission(db, code) {
   return (db.submissions || []).find(
     (item) => normalizeCode(item.code) === normalizedCode && item.reviewStatus !== "rejected"
   );
+}
+
+function normalizeConfiguredReward(value) {
+  const reward = String(value || "").trim().replace(/\s+/g, " ");
+  return reward && reward.length <= 80 ? reward : "";
 }
 
 function createGiftCodeFromCandidate(candidate, createdAt) {

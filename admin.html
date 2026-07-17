@@ -63,6 +63,19 @@
       </form>
     </dialog>
 
+    <dialog class="admin-confirm-dialog admin-reward-dialog" id="adminRewardDialog" aria-labelledby="adminRewardDialogTitle">
+      <form class="admin-confirm-panel" id="adminRewardForm">
+        <h2 id="adminRewardDialogTitle">编辑奖励</h2>
+        <p>为兑换码 <span class="admin-code" id="adminRewardCode"></span> 配置玩家可见的奖励文本。</p>
+        <label class="field-label" for="adminRewardInput">奖励内容</label>
+        <textarea class="field-input admin-reward-input" id="adminRewardInput" maxlength="80" rows="3" required></textarea>
+        <div class="admin-confirm-actions">
+          <button class="admin-action-button" type="button" data-reward-dialog-action="cancel">取消</button>
+          <button class="admin-action-button source-primary-action" type="submit">保存奖励</button>
+        </div>
+      </form>
+    </dialog>
+
     <script src="./admin.js"></script>
   </body>
 </html>

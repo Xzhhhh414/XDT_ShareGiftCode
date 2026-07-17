@@ -243,6 +243,7 @@ POST /api/admin/import-preview
 POST /api/admin/import-publish
 POST /api/admin/gift-codes/:code/takedown
 POST /api/admin/gift-codes/:code/restore
+POST /api/admin/gift-codes/:code/reward
 DELETE /api/admin/gift-codes/:code
 POST /api/gift-codes/:code/feedback
 POST /api/gift-codes/:code/reward-feedback
@@ -345,9 +346,9 @@ Phase 2 本地原型已完成的边界：
 - 新增 `POST /api/admin/import-publish`，用于把未重复候选批量写入兑换码库存并直接上架。
 - 新增管理员登录、会话和退出接口；所有 `/api/admin/*` 的管理操作均需会话认证。
 - 后台兑换码管理按状态、更新时间排序，完整管理员还能永久删除兑换码及关联记录。已配置有效期的兑换码到期后显示为`已过期`，不会因奖励待确认继续显示为`待确认`。
-- 登录页以两段式选项卡支持完整管理员与热心镇民，默认选中热心镇民：完整管理员可访问全部后台，热心镇民仅可进入兑换码管理并执行下架或恢复。
+- 登录页以两段式选项卡支持完整管理员与热心镇民，默认选中热心镇民：完整管理员可访问全部后台，热心镇民仅可进入兑换码管理并执行下架、恢复或编辑奖励文本。
 - 后台已适配手机浏览器：窄屏把管理表格转换为字段卡片，完整管理员使用页面选择器切换分页，热心镇民只保留兑换码管理；永久删除改为二次确认面板。
-- 新增 `POST /api/admin/gift-codes/:code/takedown`、`POST /api/admin/gift-codes/:code/restore` 和 `DELETE /api/admin/gift-codes/:code`。
+- 新增 `POST /api/admin/gift-codes/:code/takedown`、`POST /api/admin/gift-codes/:code/restore`、`POST /api/admin/gift-codes/:code/reward` 和 `DELETE /api/admin/gift-codes/:code`；前 3 个接口两种后台身份均可调用，永久删除仅完整管理员可调用。
 - 玩家前台已移除新兑换码分享入口，服务端不再开放公开提交接口；后台新兑换码页仅用于处理历史记录。
 - Codex 只处理包含 `兑换码` / `礼包码` 的文本块，不处理整页 HTML；发布日期不明确或不在范围内的帖子不纳入候选。
 - 服务端会校验候选：兑换码可以是 5 到 24 位且同时含字母与数字的英文数字组合，或 2 到 20 个连续汉字且被明确标注为礼包码；不能来自组队链接、URL 参数、用户 ID、日期、图片 hash 或帖子 ID。
