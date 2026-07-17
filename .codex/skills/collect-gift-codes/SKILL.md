@@ -1,15 +1,20 @@
 ---
 name: collect-gift-codes
-description: Crawl public game-community posts within a requested publication-date range, identify real gift-code posts, use Codex semantic analysis to extract structured English-alphanumeric or clearly labelled Chinese gift codes, and write an import JSON for this repository's admin console. Use when asked to collect, crawl, parse, or prepare gift codes from TapTap or other public sources by date range.
+description: Crawl public game-community posts within a requested publication-date range, identify real gift-code posts, use Codex semantic analysis to extract structured English-alphanumeric or clearly labelled Chinese gift codes, and automatically publish only high-confidence candidates to the configured backend. Use when asked to collect, crawl, parse, or prepare gift codes from TapTap or other public sources by date range.
 ---
 
 # Collect Gift Codes
 
-Use this as a manual Codex workflow. Do not call the OpenAI API, read or create an `OPENAI_API_KEY`, or upload to the public server. Codex performs semantic extraction in the active session; the operator logs in to the admin console and imports the resulting JSON.
+Use this as a Codex workflow. Do not call the OpenAI API or read or create an `OPENAI_API_KEY`. Codex performs semantic extraction in the active session. After complete collection coverage and high-confidence screening, it automatically publishes qualifying candidates through the authenticated backend API.
 
 ## Required Input
 
 Obtain a public seed URL and an inclusive publication date range in `YYYY-MM-DD` format. Treat all dates as Asia/Shanghai. Ask for the missing value when either is absent. Treat any direct post URLs supplied by the user as mandatory collection targets in addition to the seed URL.
+
+Before publishing, require these environment variables in the active local shell. Never place their values in a repository file, candidate artifact, audit artifact, tool call, or final response:
+
+- `XDT_GIFT_API_BASE_URL`: backend HTTPS root address, for example `https://124.222.121.67`.
+- `XDT_GIFT_ADMIN_PASSWORD`: the complete administrator password, not the 热心镇民 password.
 
 ## Collection Workflow
 
@@ -23,6 +28,8 @@ Obtain a public seed URL and an inclusive publication date range in `YYYY-MM-DD`
 8. Reject team/invitation codes, URL parameter values, account IDs, dates, post IDs, and image hashes. Do not require a fixed phrase immediately before the code. Preserve a short source excerpt proving the association.
 9. Produce a concise player-facing title, the stated reward or `奖励待确认`, an `expireAt` date only when explicit, and a confidence value. Do not invent an expiry date.
 10. Deduplicate by normalized code, retaining the strongest evidence and most complete reward or expiry information.
+11. Mark a candidate `autoPublishEligible: true` only when all conditions hold: coverage is complete; confidence is `high`; the source URL is HTTPS; the evidence explicitly contains the extracted code; and the post unambiguously establishes it as a game gift code. Mark all other candidates `autoPublishEligible: false` and include a concrete `autoPublishReason` in the audit artifact.
+12. After writing both artifacts, run `npm run publish:gift-codes -- docs/imports/gift-codes-YYYY-MM-DD.json`. The publishing script sends only `autoPublishEligible: true` candidates through the complete-administrator API, where normal server-side validation and duplicate filtering still apply. Never publish when coverage failed, the environment variables are missing, or there are no eligible candidates.
 
 ## Import Artifact
 
@@ -57,10 +64,11 @@ Use this shape for the compact candidate file:
       "sourceUrl": "https://www.taptap.cn/moment/...",
       "sourcePlatform": "taptap",
       "evidence": "帖子正文：今日兑换码 AM7H5TK",
-      "confidence": "high"
+      "confidence": "high",
+      "autoPublishEligible": true
     }
   ]
 }
 ```
 
-`candidates` may be empty only when the collection coverage is complete. Never put raw full-page HTML, cookies, account data, or secrets into either artifact. Summarize coverage status, fetched count, date-filtered count, relevant-post count, extracted-code count, and excluded-post reasons in the final response. Only direct the operator to import the compact candidate file through `/admin.html`; the audit file is for comparison and rule checks only.
+`candidates` may be empty only when the collection coverage is complete. Never put raw full-page HTML, cookies, account data, or secrets into either artifact. Summarize coverage status, fetched count, date-filtered count, relevant-post count, extracted-code count, automatically published count, duplicate-skipped count, and excluded-post reasons in the final response. The audit file is for comparison and rule checks; candidates that do not meet the automatic-publish threshold remain unlisted.

@@ -12,9 +12,14 @@
       <section class="login-panel" aria-labelledby="loginTitle">
         <p class="eyebrow">心动小镇</p>
         <h1 id="loginTitle">兑换码后台</h1>
-        <p class="login-description">请输入管理员密码后继续。</p>
+        <p class="login-description">选择身份并输入对应密码后继续。</p>
         <form id="loginForm" class="login-form">
-          <label class="field-label" for="adminPassword">管理员密码</label>
+          <fieldset class="login-role-options">
+            <legend class="field-label">登录身份</legend>
+            <label><input type="radio" name="role" value="admin" checked /> 管理员</label>
+            <label><input type="radio" name="role" value="player_admin" /> 热心镇民</label>
+          </fieldset>
+          <label class="field-label" for="adminPassword">密码</label>
           <input class="field-input" id="adminPassword" name="password" type="password" autocomplete="current-password" required />
           <p class="login-error" id="loginError" role="alert"></p>
           <button class="admin-action-button source-primary-action login-submit" type="submit">登录</button>

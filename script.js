@@ -11,13 +11,6 @@ const codeList = document.querySelector("#codeList");
 const emptyState = document.querySelector("#emptyState");
 const toast = document.querySelector("#toast");
 const feedbackModal = document.querySelector("#feedbackModal");
-const submissionModal = document.querySelector("#submissionModal");
-const submissionForm = document.querySelector("#submissionForm");
-const submissionTitleInput = document.querySelector("#submissionTitleInput");
-const submissionCodeInput = document.querySelector("#submissionCodeInput");
-const submissionRewardInput = document.querySelector("#submissionRewardInput");
-const submissionExpireInput = document.querySelector("#submissionExpireInput");
-const submissionSourceInput = document.querySelector("#submissionSourceInput");
 const rewardModal = document.querySelector("#rewardModal");
 const rewardForm = document.querySelector("#rewardForm");
 const rewardInput = document.querySelector("#rewardInput");
@@ -28,7 +21,6 @@ let activeRewardItem = null;
 
 async function init() {
   bindFeedbackModal();
-  bindSubmissionModal();
   bindRewardModal();
   await loadCodes();
   renderUpdatedAt();
@@ -181,125 +173,6 @@ function createCodeCard(item) {
   card.querySelector('[data-action="open-reward"]')?.addEventListener("click", () => openRewardModal(item));
 
   return card;
-}
-
-function bindSubmissionModal() {
-  document.querySelector('[data-action="open-submission"]')?.addEventListener("click", openSubmissionModal);
-
-  submissionModal?.addEventListener("click", (event) => {
-    if (event.target === submissionModal || event.target.closest('[data-action="close-submission"]')) {
-      closeSubmissionModal();
-    }
-  });
-
-  submissionForm?.addEventListener("submit", (event) => {
-    event.preventDefault();
-    submitCodeSubmission();
-  });
-
-  submissionExpireInput?.addEventListener("click", openSubmissionExpirePicker);
-  submissionExpireInput?.addEventListener("keydown", (event) => {
-    if (event.key === "Enter" || event.key === " ") {
-      event.preventDefault();
-      openSubmissionExpirePicker();
-    }
-  });
-
-  document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && !submissionModal?.hidden) {
-      closeSubmissionModal();
-    }
-  });
-}
-
-function openSubmissionExpirePicker() {
-  submissionExpireInput.focus({ preventScroll: true });
-
-  if (typeof submissionExpireInput.showPicker !== "function") {
-    return;
-  }
-
-  try {
-    submissionExpireInput.showPicker();
-  } catch {
-    // Some browsers throw when the native picker is already open.
-  }
-}
-
-function openSubmissionModal() {
-  if (!state.usesServer) {
-    showToast("需要启动本地服务后才能提交兑换码");
-    return;
-  }
-
-  submissionModal.hidden = false;
-  document.body.classList.add("modal-open");
-  submissionCodeInput.focus();
-}
-
-function closeSubmissionModal() {
-  submissionModal.hidden = true;
-  document.body.classList.remove("modal-open");
-  submissionForm?.reset();
-}
-
-async function submitCodeSubmission() {
-  const title = submissionTitleInput.value.trim();
-  const code = submissionCodeInput.value.trim().replace(/\s+/g, "");
-  const reward = submissionRewardInput.value.trim();
-  const expireAt = submissionExpireInput.value;
-  const sourceUrl = submissionSourceInput.value.trim();
-
-  if (!title) {
-    showToast("请填写名称");
-    submissionTitleInput.focus();
-    return;
-  }
-
-  if (!code) {
-    showToast("请填写兑换码");
-    submissionCodeInput.focus();
-    return;
-  }
-
-  if (!reward) {
-    showToast("请填写奖励");
-    submissionRewardInput.focus();
-    return;
-  }
-
-  if (!expireAt) {
-    showToast("请填写有效期");
-    submissionExpireInput.focus();
-    return;
-  }
-
-  try {
-    await postJson(apiUrl("/submissions"), {
-      title,
-      code,
-      reward,
-      expireAt,
-      sourceUrl,
-      clientId: state.clientId
-    });
-    showToast("已提交，等待审核");
-    closeSubmissionModal();
-  } catch (error) {
-    if (error.message === "code_already_exists") {
-      showToast("这个兑换码已经存在");
-      submissionCodeInput.focus();
-      return;
-    }
-
-    if (error.message === "submission_already_exists") {
-      showToast("这个兑换码已经有人提交，等待审核中");
-      submissionCodeInput.focus();
-      return;
-    }
-
-    showToast("提交失败，请稍后再试");
-  }
 }
 
 function bindFeedbackModal() {

@@ -17,7 +17,11 @@ const MAX_BODY_BYTES = 64000;
 const MAX_IMPORT_CANDIDATES = 50;
 const PENDING_REWARD_TEXT = "奖励待确认";
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "";
-const ADMIN_SESSION_SECRET = crypto.createHash("sha256").update(`xdt-share-gift-code-session:${ADMIN_PASSWORD}`).digest("base64url");
+const PLAYER_ADMIN_PASSWORD = "xdt2026";
+const ADMIN_SESSION_SECRET = crypto
+  .createHash("sha256")
+  .update(`xdt-share-gift-code-session:${ADMIN_PASSWORD}:${PLAYER_ADMIN_PASSWORD}`)
+  .digest("base64url");
 const ADMIN_SESSION_TTL_SECONDS = 12 * 60 * 60;
 const LOGIN_MAX_ATTEMPTS = 5;
 const LOGIN_WINDOW_MS = 15 * 60 * 1000;
@@ -96,7 +100,12 @@ async function handleApi(request, response, url) {
   }
 
   if (request.method === "GET" && url.pathname === "/api/admin/session") {
-    sendJson(response, 200, { authenticated: Boolean(getAdminSession(request)), configured: isAdminAuthConfigured() });
+    const session = getAdminSession(request);
+    sendJson(response, 200, {
+      authenticated: Boolean(session),
+      configured: isAdminAuthConfigured(),
+      role: session?.role || null
+    });
     return;
   }
 
@@ -120,33 +129,32 @@ async function handleApi(request, response, url) {
 
   if (request.method === "GET" && url.pathname === "/api/admin/overview") {
     const db = await readDb();
-    sendJson(response, 200, toAdminPayload(db));
+    sendJson(response, 200, toAdminPayload(db, getAdminSession(request).role));
     return;
   }
 
   if (request.method === "POST" && url.pathname === "/api/admin/import-preview") {
+    requireFullAdmin(request);
     await previewImportedCandidates(response, await readBody(request));
     return;
   }
 
   if (request.method === "POST" && url.pathname === "/api/admin/import-publish") {
+    requireFullAdmin(request);
     await publishImportedCandidates(response, await readBody(request));
-    return;
-  }
-
-  if (request.method === "POST" && url.pathname === "/api/submissions") {
-    await createSubmission(response, await readBody(request));
     return;
   }
 
   const submissionReviewMatch = url.pathname.match(/^\/api\/admin\/submissions\/([^/]+)\/review$/);
   if (request.method === "POST" && submissionReviewMatch) {
+    requireFullAdmin(request);
     await reviewSubmission(response, submissionReviewMatch[1], await readBody(request));
     return;
   }
 
   const rewardReviewMatch = url.pathname.match(/^\/api\/admin\/reward-feedback\/([^/]+)\/review$/);
   if (request.method === "POST" && rewardReviewMatch) {
+    requireFullAdmin(request);
     await reviewRewardFeedback(response, rewardReviewMatch[1], await readBody(request));
     return;
   }
@@ -154,6 +162,13 @@ async function handleApi(request, response, url) {
   const codeActionMatch = url.pathname.match(/^\/api\/admin\/gift-codes\/([^/]+)\/(takedown|restore)$/);
   if (request.method === "POST" && codeActionMatch) {
     await updateCodeVisibility(response, codeActionMatch[1], codeActionMatch[2], await readBody(request));
+    return;
+  }
+
+  const deleteCodeMatch = url.pathname.match(/^\/api\/admin\/gift-codes\/([^/]+)$/);
+  if (request.method === "DELETE" && deleteCodeMatch) {
+    requireFullAdmin(request);
+    await deleteGiftCode(response, deleteCodeMatch[1]);
     return;
   }
 
@@ -251,68 +266,6 @@ async function createRewardFeedback(response, rawCode, body) {
   sendJson(response, 201, payload);
 }
 
-async function createSubmission(response, body) {
-  const title = String(body.title || "").trim().replace(/\s+/g, " ");
-  const code = normalizeSubmittedCode(body.code);
-  const reward = String(body.reward || "").trim().replace(/\s+/g, " ");
-  const expireAt = String(body.expireAt || "").trim();
-  const sourceUrl = String(body.sourceUrl || "").trim();
-  const note = String(body.note || "").trim().replace(/\s+/g, " ").slice(0, 160);
-
-  if (!title || title.length > 40) {
-    sendJson(response, 400, { error: "invalid_title" });
-    return;
-  }
-
-  if (!code) {
-    sendJson(response, 400, { error: "invalid_code" });
-    return;
-  }
-
-  if (!reward || reward.length > 80) {
-    sendJson(response, 400, { error: "invalid_reward" });
-    return;
-  }
-
-  if (!isValidDateOnly(expireAt)) {
-    sendJson(response, 400, { error: "invalid_expire_at" });
-    return;
-  }
-
-  const payload = await mutateDb(async (db) => {
-    if (findCode(db, normalizeCode(code))) {
-      throw new ApiError(409, "code_already_exists");
-    }
-
-    if (findPendingSubmission(db, code)) {
-      throw new ApiError(409, "submission_already_exists");
-    }
-
-    const submission = {
-      id: createId("sub"),
-      title,
-      code,
-      reward,
-      expireAt,
-      sourceUrl,
-      note,
-      reviewStatus: "pending",
-      createdAt: new Date().toISOString(),
-      clientId: getClientId(body)
-    };
-
-    db.submissions = [...(db.submissions || []), submission];
-    db.updatedAt = submission.createdAt;
-
-    return {
-      submission: toClientSubmission(submission),
-      updatedAt: db.updatedAt
-    };
-  });
-
-  sendJson(response, 201, payload);
-}
-
 async function previewImportedCandidates(response, body) {
   const candidates = normalizeImportedCandidates(body.candidates);
   const db = await readDb();
@@ -391,6 +344,27 @@ async function updateCodeVisibility(response, rawCode, action, body) {
       code: toAdminCode(code),
       updatedAt: db.updatedAt
     };
+  });
+
+  sendJson(response, 200, payload);
+}
+
+async function deleteGiftCode(response, rawCode) {
+  const codeValue = normalizeCode(decodeRouteCode(rawCode));
+
+  const payload = await mutateDb(async (db) => {
+    if (!findCode(db, codeValue)) {
+      throw new ApiError(404, "code_not_found");
+    }
+
+    const removedAt = new Date().toISOString();
+    db.codes = (db.codes || []).filter((item) => normalizeCode(item.code) !== codeValue);
+    db.feedback = (db.feedback || []).filter((item) => normalizeCode(item.code) !== codeValue);
+    db.rewardFeedback = (db.rewardFeedback || []).filter((item) => normalizeCode(item.code) !== codeValue);
+    db.submissions = (db.submissions || []).filter((item) => normalizeCode(item.code) !== codeValue);
+    db.updatedAt = removedAt;
+
+    return { deletedCode: codeValue, updatedAt: db.updatedAt };
   });
 
   sendJson(response, 200, payload);
@@ -503,18 +477,24 @@ async function loginAdmin(request, response, body) {
     throw new ApiError(429, "login_rate_limited");
   }
 
+  const role = body.role === "player_admin" ? "player_admin" : "admin";
   const password = String(body.password || "");
-  if (!safeEqual(password, ADMIN_PASSWORD)) {
+  const expectedPassword = role === "player_admin" ? PLAYER_ADMIN_PASSWORD : ADMIN_PASSWORD;
+  if (!expectedPassword) {
+    throw new ApiError(503, "admin_auth_not_configured");
+  }
+
+  if (!safeEqual(password, expectedPassword)) {
     recordFailedLogin(clientKey);
     throw new ApiError(401, "invalid_admin_password");
   }
 
   loginAttempts.delete(clientKey);
-  sendJson(response, 200, { ok: true }, { "Set-Cookie": createAdminSessionCookie(request) });
+  sendJson(response, 200, { ok: true, role }, { "Set-Cookie": createAdminSessionCookie(request, role) });
 }
 
 function isAdminAuthConfigured() {
-  return Boolean(ADMIN_PASSWORD);
+  return Boolean(ADMIN_PASSWORD || PLAYER_ADMIN_PASSWORD);
 }
 
 function requireAdmin(request) {
@@ -522,9 +502,21 @@ function requireAdmin(request) {
     throw new ApiError(503, "admin_auth_not_configured");
   }
 
-  if (!getAdminSession(request)) {
+  const session = getAdminSession(request);
+  if (!session) {
     throw new ApiError(401, "admin_auth_required");
   }
+
+  return session;
+}
+
+function requireFullAdmin(request) {
+  const session = requireAdmin(request);
+  if (session.role !== "admin") {
+    throw new ApiError(403, "admin_role_forbidden");
+  }
+
+  return session;
 }
 
 function requireSameOrigin(request) {
@@ -563,15 +555,19 @@ function getAdminSession(request) {
 
   try {
     const payload = JSON.parse(Buffer.from(encodedPayload, "base64url").toString("utf8"));
-    return Number(payload.expiresAt) > Date.now() ? payload : null;
+    if (Number(payload.expiresAt) <= Date.now()) {
+      return null;
+    }
+
+    return { ...payload, role: payload.role === "player_admin" ? "player_admin" : "admin" };
   } catch {
     return null;
   }
 }
 
-function createAdminSessionCookie(request) {
+function createAdminSessionCookie(request, role) {
   const expiresAt = Date.now() + ADMIN_SESSION_TTL_SECONDS * 1000;
-  const payload = Buffer.from(JSON.stringify({ expiresAt, nonce: crypto.randomBytes(16).toString("hex") })).toString("base64url");
+  const payload = Buffer.from(JSON.stringify({ role, expiresAt, nonce: crypto.randomBytes(16).toString("hex") })).toString("base64url");
   const value = `${payload}.${signAdminSession(payload)}`;
   return buildAdminSessionCookie(request, value, ADMIN_SESSION_TTL_SECONDS);
 }
@@ -664,7 +660,6 @@ function isPublicPath(requestPath) {
 function isPlayerApiPath(pathname) {
   return (
     pathname === "/api/gift-codes" ||
-    pathname === "/api/submissions" ||
     /^\/api\/gift-codes\/[^/]+\/(feedback|reward-feedback)$/.test(pathname)
   );
 }
@@ -806,14 +801,20 @@ function toClientPayload(db) {
   };
 }
 
-function toAdminPayload(db) {
-  return {
+function toAdminPayload(db, role) {
+  const payload = {
     updatedAt: db.updatedAt,
-    codes: [...(db.codes || [])].sort(sortAdminCodes).map(toAdminCode),
-    submissions: [...(db.submissions || [])].sort(sortAdminReviewItems).map(toClientSubmission),
-    rewardFeedback: [...(db.rewardFeedback || [])].sort(sortAdminReviewItems).map(toClientRewardFeedback),
-    feedback: [...(db.feedback || [])].sort(sortByCreatedAtDesc)
+    role,
+    codes: [...(db.codes || [])].sort(sortAdminCodes).map(toAdminCode)
   };
+
+  if (role === "admin") {
+    payload.submissions = [...(db.submissions || [])].sort(sortAdminReviewItems).map(toClientSubmission);
+    payload.rewardFeedback = [...(db.rewardFeedback || [])].sort(sortAdminReviewItems).map(toClientRewardFeedback);
+    payload.feedback = [...(db.feedback || [])].sort(sortByCreatedAtDesc);
+  }
+
+  return payload;
 }
 
 function toClientCode(db, code) {

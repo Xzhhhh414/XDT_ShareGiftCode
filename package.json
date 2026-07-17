@@ -5,8 +5,9 @@
   "type": "commonjs",
   "scripts": {
     "start": "node server.js",
-    "check": "node --check server.js && node --check script.js && node --check admin.js && node --check data/codes.js && node --check runtime-config.js && node --check scripts/build-taptap-package.js",
+    "check": "node --check server.js && node --check script.js && node --check admin.js && node --check data/codes.js && node --check runtime-config.js && node --check scripts/build-taptap-package.js && node --check scripts/publish-gift-codes.js",
     "build:taptap": "node scripts/build-taptap-package.js",
-    "package:taptap": "node scripts/build-taptap-package.js --zip"
+    "package:taptap": "node scripts/build-taptap-package.js --zip",
+    "publish:gift-codes": "node scripts/publish-gift-codes.js"
   }
 }

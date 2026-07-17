@@ -2,6 +2,7 @@ const ADMIN_TABS = ["sourceParser", "codes", "submissions", "rewardFeedback", "f
 
 const adminState = {
   activeTab: getInitialTab(),
+  role: "admin",
   updatedAt: "",
   codes: [],
   submissions: [],
@@ -35,6 +36,9 @@ async function ensureAdminSession() {
     window.location.replace("/login.html");
     throw new Error("admin_auth_required");
   }
+
+  adminState.role = payload.role === "player_admin" ? "player_admin" : "admin";
+  ensureAllowedActiveTab();
 }
 
 async function refreshAdmin() {
@@ -50,6 +54,7 @@ async function refreshAdmin() {
 
   const payload = await response.json();
   adminState.updatedAt = payload.updatedAt || "";
+  adminState.role = payload.role === "player_admin" ? "player_admin" : adminState.role;
   adminState.codes = payload.codes || [];
   adminState.submissions = payload.submissions || [];
   adminState.rewardFeedback = payload.rewardFeedback || [];
@@ -62,7 +67,7 @@ function bindAdminTabs() {
   document.querySelectorAll("[data-admin-tab]").forEach((button) => {
     button.addEventListener("click", () => {
       const tab = button.dataset.adminTab;
-      if (!ADMIN_TABS.includes(tab) || tab === adminState.activeTab) {
+      if (!getAllowedTabs().includes(tab) || tab === adminState.activeTab) {
         return;
       }
 
@@ -75,6 +80,7 @@ function bindAdminTabs() {
 }
 
 function renderAdmin() {
+  ensureAllowedActiveTab();
   document.querySelector("#adminUpdatedAt").textContent = `最近更新 ${formatDateTime(adminState.updatedAt)}`;
 
   renderCount("#sourceCandidateCount", adminState.sourceDraft.candidates.length);
@@ -93,10 +99,23 @@ function renderCount(selector, count) {
 
 function renderTabs() {
   document.querySelectorAll("[data-admin-tab]").forEach((button) => {
+    const allowed = getAllowedTabs().includes(button.dataset.adminTab);
     const isActive = button.dataset.adminTab === adminState.activeTab;
+    button.hidden = !allowed;
     button.classList.toggle("is-active", isActive);
-    button.setAttribute("aria-current", isActive ? "page" : "false");
+    button.setAttribute("aria-current", allowed && isActive ? "page" : "false");
   });
+}
+
+function getAllowedTabs() {
+  return adminState.role === "player_admin" ? ["codes"] : ADMIN_TABS;
+}
+
+function ensureAllowedActiveTab() {
+  if (!getAllowedTabs().includes(adminState.activeTab)) {
+    adminState.activeTab = "codes";
+    window.location.hash = "codes";
+  }
 }
 
 function renderActivePanel() {
@@ -142,9 +161,10 @@ function renderSourceParserPanel() {
 }
 
 function renderCodeManagementPanel() {
+  const canDelete = adminState.role === "admin";
   adminPanel.innerHTML = `
     <section class="admin-page" aria-label="兑换码管理">
-      ${renderPanelHeader("兑换码管理", "查看当前兑换码库存，支持手动下架和恢复。已下架内容不会在前台展示。")}
+      ${renderPanelHeader("兑换码管理", canDelete ? "支持手动下架、恢复和永久删除。永久删除会同时清理关联反馈。" : "支持手动下架和恢复。已下架内容不会在前台展示。")}
       <div class="admin-table-wrap">
         <table class="admin-table is-codes">
           <colgroup>
@@ -417,19 +437,19 @@ function renderCodeVisibility(item) {
 }
 
 function renderCodeActions(item) {
-  if (item.visible !== false && isCodeExpired(item)) {
-    return '<span class="admin-action-placeholder">-</span>';
+  const actions = [];
+  if (!(item.visible !== false && isCodeExpired(item))) {
+    const action = item.visible === false ? "restore" : "takedown";
+    const label = item.visible === false ? "恢复" : "下架";
+    const dangerClass = item.visible === false ? "" : " danger";
+    actions.push(`<button class="admin-action-button${dangerClass}" type="button" data-code-action="${escapeAttr(action)}" data-code="${escapeAttr(item.code)}">${escapeHtml(label)}</button>`);
   }
 
-  const action = item.visible === false ? "restore" : "takedown";
-  const label = item.visible === false ? "恢复" : "下架";
-  const dangerClass = item.visible === false ? "" : " danger";
+  if (adminState.role === "admin") {
+    actions.push(`<button class="admin-action-button danger" type="button" data-code-action="delete" data-code="${escapeAttr(item.code)}">删除</button>`);
+  }
 
-  return `
-    <div class="admin-actions">
-      <button class="admin-action-button${dangerClass}" type="button" data-code-action="${escapeAttr(action)}" data-code="${escapeAttr(item.code)}">${escapeHtml(label)}</button>
-    </div>
-  `;
+  return actions.length ? `<div class="admin-actions">${actions.join("")}</div>` : '<span class="admin-action-placeholder">-</span>';
 }
 
 function formatConfidence(confidence) {
@@ -666,13 +686,21 @@ async function logoutAdmin() {
 }
 
 async function submitCodeAction(code, action) {
-  if (!code || !["takedown", "restore"].includes(action)) {
+  if (!code || !["takedown", "restore", "delete"].includes(action)) {
+    return;
+  }
+
+  if (action === "delete" && !window.confirm(`确定永久删除兑换码“${code}”吗？关联的使用反馈、奖励反馈和历史提交也会被删除，无法恢复。`)) {
     return;
   }
 
   try {
-    await postJson(`/api/admin/gift-codes/${encodeURIComponent(code)}/${action}`, {});
-    showToast(action === "restore" ? "已恢复展示" : "已下架");
+    if (action === "delete") {
+      await deleteJson(`/api/admin/gift-codes/${encodeURIComponent(code)}`);
+    } else {
+      await postJson(`/api/admin/gift-codes/${encodeURIComponent(code)}/${action}`, {});
+    }
+    showToast(action === "restore" ? "已恢复展示" : action === "delete" ? "已永久删除" : "已下架");
     await refreshAdmin();
   } catch (error) {
     showToast(getCodeActionErrorMessage(error.message));
@@ -682,6 +710,10 @@ async function submitCodeAction(code, action) {
 function getCodeActionErrorMessage(error) {
   if (error === "code_not_found") {
     return "兑换码不存在";
+  }
+
+  if (error === "admin_role_forbidden") {
+    return "当前身份无此权限";
   }
 
   return "操作失败，请稍后再试";
@@ -720,6 +752,23 @@ async function postJson(url, body) {
       Accept: "application/json"
     },
     body: JSON.stringify(body)
+  });
+
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({}));
+    if (response.status === 401) {
+      window.location.replace("/login.html");
+    }
+    throw new Error(payload.error || "request_failed");
+  }
+
+  return response.json();
+}
+
+async function deleteJson(url) {
+  const response = await fetch(url, {
+    method: "DELETE",
+    headers: { Accept: "application/json" }
   });
 
   if (!response.ok) {

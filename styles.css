@@ -611,6 +611,28 @@ h2 {
   margin-top: 24px;
 }
 
+.login-role-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.login-role-options legend {
+  width: 100%;
+  margin-bottom: 2px;
+}
+
+.login-role-options label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text);
+  font-size: 14px;
+}
+
 .login-error {
   min-height: 20px;
   margin: 0;

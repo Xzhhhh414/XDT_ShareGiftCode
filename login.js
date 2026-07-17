@@ -8,6 +8,7 @@ loginForm.addEventListener("submit", async (event) => {
   loginError.textContent = "";
 
   const password = new FormData(loginForm).get("password");
+  const role = new FormData(loginForm).get("role");
   const submitButton = loginForm.querySelector("button[type=submit]");
   submitButton.disabled = true;
 
@@ -15,7 +16,7 @@ loginForm.addEventListener("submit", async (event) => {
     const response = await fetch("/api/admin/login", {
       method: "POST",
       headers: { "Content-Type": "application/json", Accept: "application/json" },
-      body: JSON.stringify({ password })
+      body: JSON.stringify({ role, password })
     });
 
     if (!response.ok) {
