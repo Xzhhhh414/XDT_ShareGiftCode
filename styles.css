@@ -612,9 +612,8 @@ h2 {
 }
 
 .login-role-options {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px 16px;
+  display: grid;
+  gap: 8px;
   margin: 0;
   padding: 0;
   border: 0;
@@ -622,15 +621,51 @@ h2 {
 
 .login-role-options legend {
   width: 100%;
-  margin-bottom: 2px;
+  margin-bottom: 0;
 }
 
-.login-role-options label {
+.login-role-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #f4f8f6;
+}
+
+.login-role-tab {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
-  color: var(--text);
+  min-height: 38px;
+  border-radius: calc(var(--radius) - 2px);
+  color: var(--muted);
+  cursor: pointer;
   font-size: 14px;
+  font-weight: 760;
+  transition: background-color 160ms ease, box-shadow 160ms ease, color 160ms ease;
+}
+
+.login-role-tab input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
+.login-role-tab:has(input:checked) {
+  background: var(--surface);
+  box-shadow: 0 1px 3px rgba(24, 68, 47, 0.14);
+  color: var(--green-strong);
+}
+
+.login-role-tab:has(input:focus-visible) {
+  outline: 2px solid rgba(31, 138, 91, 0.5);
+  outline-offset: 1px;
 }
 
 .login-error {

@@ -16,8 +16,16 @@
         <form id="loginForm" class="login-form">
           <fieldset class="login-role-options">
             <legend class="field-label">登录身份</legend>
-            <label><input type="radio" name="role" value="admin" checked /> 管理员</label>
-            <label><input type="radio" name="role" value="player_admin" /> 热心镇民</label>
+            <div class="login-role-tabs">
+              <label class="login-role-tab">
+                <input type="radio" name="role" value="admin" />
+                <span>管理员</span>
+              </label>
+              <label class="login-role-tab">
+                <input type="radio" name="role" value="player_admin" checked />
+                <span>热心镇民</span>
+              </label>
+            </div>
           </fieldset>
           <label class="field-label" for="adminPassword">密码</label>
           <input class="field-input" id="adminPassword" name="password" type="password" autocomplete="current-password" required />
