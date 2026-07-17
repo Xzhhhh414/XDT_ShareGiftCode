@@ -1,6 +1,6 @@
 ---
 name: collect-gift-codes
-description: Crawl public game-community posts within a requested publication-date range, identify real gift-code posts, use Codex semantic analysis to extract structured English-alphanumeric or clearly labelled Chinese gift codes, and automatically publish only high-confidence candidates to the configured backend. Use when asked to collect, crawl, parse, or prepare gift codes from TapTap or other public sources by date range.
+description: Crawl public game-community posts within a requested publication-date range, identify real gift-code posts, use Codex semantic analysis to extract structured English-alphanumeric or clearly labelled Chinese gift codes, and automatically publish only high-confidence candidates with explicitly stated rewards to the configured backend. Use when asked to collect, crawl, parse, or prepare gift codes from TapTap or other public sources by date range.
 ---
 
 # Collect Gift Codes
@@ -28,7 +28,7 @@ Before publishing, require these environment variables in the active local shell
 8. Reject team/invitation codes, URL parameter values, account IDs, dates, post IDs, and image hashes. Do not require a fixed phrase immediately before the code. Preserve a short source excerpt proving the association.
 9. Produce a concise player-facing title, the stated reward or `奖励待确认`, an `expireAt` date only when explicit, and a confidence value. Do not invent an expiry date.
 10. Deduplicate by normalized code, retaining the strongest evidence and most complete reward or expiry information.
-11. Mark a candidate `autoPublishEligible: true` only when all conditions hold: coverage is complete; confidence is `high`; the source URL is HTTPS; the evidence explicitly contains the extracted code; and the post unambiguously establishes it as a game gift code. Mark all other candidates `autoPublishEligible: false` and include a concrete `autoPublishReason` in the audit artifact.
+11. Mark a candidate `autoPublishEligible: true` only when all conditions hold: coverage is complete; confidence is `high`; the source URL is HTTPS; the evidence explicitly contains the extracted code; the post unambiguously establishes it as a game gift code; and the reward is explicitly stated. A missing reward or `奖励待确认` never qualifies for automatic publishing. Mark all other candidates `autoPublishEligible: false` and include a concrete `autoPublishReason` in the audit artifact.
 12. After writing both artifacts, run `npm run publish:gift-codes -- docs/imports/gift-codes-YYYY-MM-DD.json`. The publishing script sends only `autoPublishEligible: true` candidates through the complete-administrator API, where normal server-side validation and duplicate filtering still apply. Never publish when coverage failed, the environment variables are missing, or there are no eligible candidates.
 
 ## Import Artifact

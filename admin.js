@@ -164,7 +164,7 @@ function renderCodeManagementPanel() {
   const canDelete = adminState.role === "admin";
   adminPanel.innerHTML = `
     <section class="admin-page" aria-label="兑换码管理">
-      ${renderPanelHeader("兑换码管理", canDelete ? "支持手动下架、恢复和永久删除。永久删除会同时清理关联反馈。" : "支持手动下架和恢复。已下架内容不会在前台展示。")}
+      ${renderPanelHeader("兑换码管理", canDelete ? "待确认信息会优先显示；支持手动下架、恢复和永久删除。" : "待确认信息会优先显示；支持手动下架和恢复。")}
       <div class="admin-table-wrap">
         <table class="admin-table is-codes">
           <colgroup>
@@ -425,6 +425,10 @@ function renderCodeRow(item) {
 }
 
 function renderCodeVisibility(item) {
+  if (item.visible !== false && isCodePendingConfirmation(item)) {
+    return '<span class="admin-status is-pending">待确认</span>';
+  }
+
   if (item.visible === false) {
     return `<span class="admin-status is-rejected" title="${escapeAttr(item.hiddenReason || "")}">已下架</span>`;
   }
@@ -450,6 +454,15 @@ function renderCodeActions(item) {
   }
 
   return actions.length ? `<div class="admin-actions">${actions.join("")}</div>` : '<span class="admin-action-placeholder">-</span>';
+}
+
+function isPendingReward(value) {
+  const reward = String(value || "").trim();
+  return !reward || reward === "奖励待确认" || reward === "待确认" || reward === "来源未明确";
+}
+
+function isCodePendingConfirmation(item) {
+  return item.status === "unknown" || isPendingReward(item.reward) || !item.expireAt;
 }
 
 function formatConfidence(confidence) {

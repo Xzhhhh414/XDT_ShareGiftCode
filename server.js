@@ -1038,12 +1038,43 @@ function sortByCreatedAtDesc(a, b) {
 }
 
 function sortAdminCodes(a, b) {
-  const visibleDiff = Number(a.visible === false) - Number(b.visible === false);
-  if (visibleDiff !== 0) {
-    return visibleDiff;
+  const statusDiff = getAdminCodeStatusPriority(a) - getAdminCodeStatusPriority(b);
+  if (statusDiff !== 0) {
+    return statusDiff;
   }
 
   return getCodeSortTime(b) - getCodeSortTime(a);
+}
+
+function getAdminCodeStatusPriority(code) {
+  if (code.visible !== false && isCodePendingConfirmation(code)) {
+    return 0;
+  }
+
+  if (code.visible !== false && !isCodeExpired(code)) {
+    return 1;
+  }
+
+  if (code.visible === false) {
+    return 2;
+  }
+
+  return 3;
+}
+
+function isCodePendingConfirmation(code) {
+  const expireAt = new Date(code.expireAt);
+  return code.status === "unknown" || !isConfiguredReward(code.reward) || Number.isNaN(expireAt.getTime());
+}
+
+function isConfiguredReward(value) {
+  const reward = String(value || "").trim();
+  return Boolean(reward && reward !== PENDING_REWARD_TEXT && reward !== "待确认" && reward !== "来源未明确");
+}
+
+function isCodeExpired(code) {
+  const expireAt = new Date(code.expireAt);
+  return !Number.isNaN(expireAt.getTime()) && expireAt.getTime() < Date.now();
 }
 
 function getCodeSortTime(code) {

@@ -67,7 +67,12 @@ function isAutoPublishEligible(candidate) {
 
   const code = String(candidate.code || "").trim();
   const evidence = String(candidate.evidence || "").toLowerCase();
-  return Boolean(code && evidence.includes(code.toLowerCase()) && isHttpsUrl(candidate.sourceUrl));
+  return Boolean(code && evidence.includes(code.toLowerCase()) && hasExplicitReward(candidate.reward) && isHttpsUrl(candidate.sourceUrl));
+}
+
+function hasExplicitReward(value) {
+  const reward = String(value || "").trim();
+  return Boolean(reward && reward !== "奖励待确认" && reward !== "待确认" && reward !== "来源未明确");
 }
 
 function isHttpsUrl(value) {

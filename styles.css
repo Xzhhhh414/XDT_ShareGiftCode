@@ -709,6 +709,10 @@ h2 {
   white-space: nowrap;
 }
 
+.admin-tab[hidden] {
+  display: none;
+}
+
 .admin-tab.is-active {
   border-bottom-color: var(--green);
   color: var(--green-strong);
