@@ -18,6 +18,12 @@ const adminState = {
 
 const toast = document.querySelector("#toast");
 const adminPanel = document.querySelector("#adminPanel");
+const adminMobilePageControl = document.querySelector("#adminMobilePageControl");
+const adminMobilePageSelect = document.querySelector("#adminMobilePageSelect");
+const adminDeleteDialog = document.querySelector("#adminDeleteDialog");
+const adminDeleteCode = document.querySelector("#adminDeleteCode");
+const adminDeleteConfirm = document.querySelector("#adminDeleteConfirm");
+let pendingDeleteCode = "";
 
 initAdmin().catch(() => {
   showToast("后台加载失败，请确认本地服务已启动");
@@ -25,6 +31,7 @@ initAdmin().catch(() => {
 
 async function initAdmin() {
   bindAdminTabs();
+  bindDeleteDialog();
   await ensureAdminSession();
   await refreshAdmin();
 }
@@ -77,6 +84,18 @@ function bindAdminTabs() {
       adminPanel.focus({ preventScroll: true });
     });
   });
+
+  adminMobilePageSelect.addEventListener("change", () => {
+    const tab = adminMobilePageSelect.value;
+    if (!getAllowedTabs().includes(tab) || tab === adminState.activeTab) {
+      return;
+    }
+
+    adminState.activeTab = tab;
+    window.location.hash = tab;
+    renderAdmin();
+    adminPanel.focus({ preventScroll: true });
+  });
 }
 
 function renderAdmin() {
@@ -98,13 +117,50 @@ function renderCount(selector, count) {
 }
 
 function renderTabs() {
+  const allowedTabs = getAllowedTabs();
   document.querySelectorAll("[data-admin-tab]").forEach((button) => {
-    const allowed = getAllowedTabs().includes(button.dataset.adminTab);
+    const allowed = allowedTabs.includes(button.dataset.adminTab);
     const isActive = button.dataset.adminTab === adminState.activeTab;
     button.hidden = !allowed;
     button.classList.toggle("is-active", isActive);
     button.setAttribute("aria-current", allowed && isActive ? "page" : "false");
   });
+
+  adminMobilePageControl.hidden = allowedTabs.length <= 1;
+  adminMobilePageSelect.innerHTML = allowedTabs
+    .map((tab) => `<option value="${escapeAttr(tab)}">${escapeHtml(getAdminTabLabel(tab))}（${getAdminTabCount(tab)}）</option>`)
+    .join("");
+  adminMobilePageSelect.value = adminState.activeTab;
+}
+
+function getAdminTabLabel(tab) {
+  return {
+    sourceParser: "采集导入",
+    codes: "兑换码管理",
+    submissions: "新兑换码",
+    rewardFeedback: "奖励补充",
+    feedback: "使用结果"
+  }[tab] || "后台页面";
+}
+
+function getAdminTabCount(tab) {
+  if (tab === "sourceParser") {
+    return adminState.sourceDraft.candidates.length;
+  }
+
+  if (tab === "codes") {
+    return adminState.codes.length;
+  }
+
+  if (tab === "submissions") {
+    return adminState.submissions.length;
+  }
+
+  if (tab === "rewardFeedback") {
+    return adminState.rewardFeedback.length;
+  }
+
+  return adminState.feedback.length;
 }
 
 function getAllowedTabs() {
@@ -382,12 +438,12 @@ function renderSourceCandidateTable() {
 function renderSourceCandidateRow(item) {
   return `
     <tr>
-      <td>${renderCandidateDuplicateStatus(item.duplicateStatus)}</td>
-      <td><span class="admin-code">${escapeHtml(item.code)}</span></td>
-      <td>${escapeHtml(item.title)}</td>
-      <td>${escapeHtml(item.reward || "奖励待确认")}</td>
-      <td>${escapeHtml(formatDate(item.expireAt))}</td>
-      <td>${escapeHtml(formatConfidence(item.confidence))}</td>
+      <td data-label="状态">${renderCandidateDuplicateStatus(item.duplicateStatus)}</td>
+      <td data-label="兑换码"><span class="admin-code">${escapeHtml(item.code)}</span></td>
+      <td data-label="名称">${escapeHtml(item.title)}</td>
+      <td data-label="奖励">${escapeHtml(item.reward || "奖励待确认")}</td>
+      <td data-label="有效期">${escapeHtml(formatDate(item.expireAt))}</td>
+      <td data-label="置信度">${escapeHtml(formatConfidence(item.confidence))}</td>
     </tr>
   `;
 }
@@ -412,14 +468,14 @@ function formatDuplicateStatus(status) {
 function renderCodeRow(item) {
   return `
     <tr>
-      <td>${renderCodeVisibility(item)}</td>
-      <td><span class="admin-code">${escapeHtml(item.code)}</span></td>
-      <td>${escapeHtml(item.title || "未填写名称")}</td>
-      <td>${escapeHtml(item.reward || "奖励待确认")}</td>
-      <td>${escapeHtml(formatCodeExpire(item.expireAt))}</td>
-      <td>${renderSource(item.sourceUrl)}</td>
-      <td>${escapeHtml(formatDateTime(item.updatedAt || item.firstSeenAt))}</td>
-      <td>${renderCodeActions(item)}</td>
+      <td data-label="状态">${renderCodeVisibility(item)}</td>
+      <td data-label="兑换码"><span class="admin-code">${escapeHtml(item.code)}</span></td>
+      <td data-label="名称">${escapeHtml(item.title || "未填写名称")}</td>
+      <td data-label="奖励">${escapeHtml(item.reward || "奖励待确认")}</td>
+      <td data-label="有效期">${escapeHtml(formatCodeExpire(item.expireAt))}</td>
+      <td data-label="来源">${renderSource(item.sourceUrl)}</td>
+      <td data-label="更新时间">${escapeHtml(formatDateTime(item.updatedAt || item.firstSeenAt))}</td>
+      <td data-label="操作">${renderCodeActions(item)}</td>
     </tr>
   `;
 }
@@ -450,7 +506,13 @@ function renderCodeActions(item) {
   }
 
   if (adminState.role === "admin") {
-    actions.push(`<button class="admin-action-button danger" type="button" data-code-action="delete" data-code="${escapeAttr(item.code)}">删除</button>`);
+    actions.push(`
+      <button class="admin-action-button danger admin-delete-desktop" type="button" data-code-action="delete" data-code="${escapeAttr(item.code)}">删除</button>
+      <details class="admin-delete-mobile">
+        <summary>更多</summary>
+        <button class="admin-action-button danger" type="button" data-code-action="delete" data-code="${escapeAttr(item.code)}">永久删除</button>
+      </details>
+    `);
   }
 
   return actions.length ? `<div class="admin-actions">${actions.join("")}</div>` : '<span class="admin-action-placeholder">-</span>';
@@ -476,14 +538,14 @@ function getNewSourceCandidates() {
 function renderSubmissionRow(item) {
   return `
     <tr>
-      <td>${renderStatus(item.reviewStatus)}</td>
-      <td><span class="admin-code">${escapeHtml(item.code)}</span></td>
-      <td>${escapeHtml(item.title || "未填写名称")}</td>
-      <td>${escapeHtml(item.reward || "未填写奖励")}</td>
-      <td>${escapeHtml(formatDate(item.expireAt))}</td>
-      <td>${renderSource(item.sourceUrl)}</td>
-      <td>${escapeHtml(formatDateTime(item.createdAt))}</td>
-      <td>${renderReviewActions("submission", item.id, item.reviewStatus)}</td>
+      <td data-label="状态">${renderStatus(item.reviewStatus)}</td>
+      <td data-label="兑换码"><span class="admin-code">${escapeHtml(item.code)}</span></td>
+      <td data-label="名称">${escapeHtml(item.title || "未填写名称")}</td>
+      <td data-label="奖励">${escapeHtml(item.reward || "未填写奖励")}</td>
+      <td data-label="有效期">${escapeHtml(formatDate(item.expireAt))}</td>
+      <td data-label="来源">${renderSource(item.sourceUrl)}</td>
+      <td data-label="提交时间">${escapeHtml(formatDateTime(item.createdAt))}</td>
+      <td data-label="操作">${renderReviewActions("submission", item.id, item.reviewStatus)}</td>
     </tr>
   `;
 }
@@ -491,12 +553,12 @@ function renderSubmissionRow(item) {
 function renderRewardFeedbackRow(item) {
   return `
     <tr>
-      <td>${renderStatus(item.reviewStatus)}</td>
-      <td><span class="admin-code">${escapeHtml(item.code)}</span></td>
-      <td>${escapeHtml(item.reward)}</td>
-      <td>${escapeHtml(formatDateTime(item.createdAt))}</td>
-      <td>${escapeHtml(item.reviewedAt ? formatDateTime(item.reviewedAt) : "-")}</td>
-      <td>${renderReviewActions("reward", item.id, item.reviewStatus)}</td>
+      <td data-label="状态">${renderStatus(item.reviewStatus)}</td>
+      <td data-label="兑换码"><span class="admin-code">${escapeHtml(item.code)}</span></td>
+      <td data-label="奖励内容">${escapeHtml(item.reward)}</td>
+      <td data-label="提交时间">${escapeHtml(formatDateTime(item.createdAt))}</td>
+      <td data-label="审核时间">${escapeHtml(item.reviewedAt ? formatDateTime(item.reviewedAt) : "-")}</td>
+      <td data-label="操作">${renderReviewActions("reward", item.id, item.reviewStatus)}</td>
     </tr>
   `;
 }
@@ -507,9 +569,9 @@ function renderFeedbackRow(item) {
 
   return `
     <tr>
-      <td><span class="admin-code">${escapeHtml(item.code)}</span></td>
-      <td><span class="admin-status ${resultClass}">${escapeHtml(result)}</span></td>
-      <td>${escapeHtml(formatDateTime(item.createdAt))}</td>
+      <td data-label="兑换码"><span class="admin-code">${escapeHtml(item.code)}</span></td>
+      <td data-label="结果"><span class="admin-status ${resultClass}">${escapeHtml(result)}</span></td>
+      <td data-label="反馈时间">${escapeHtml(formatDateTime(item.createdAt))}</td>
     </tr>
   `;
 }
@@ -567,7 +629,8 @@ function renderSource(sourceUrl) {
 
   return `
     <a class="admin-source-link" href="${escapeAttr(value)}" title="${escapeAttr(value)}" target="_blank" rel="noreferrer noopener">
-      ${escapeHtml(value)}
+      <span class="admin-source-url">${escapeHtml(value)}</span>
+      <span class="admin-source-mobile-label">查看来源</span>
     </a>
   `;
 }
@@ -602,6 +665,25 @@ function bindAdminActions() {
   });
 
   document.querySelector('[data-admin-action="logout"]')?.addEventListener("click", logoutAdmin);
+}
+
+function bindDeleteDialog() {
+  adminDeleteDialog?.addEventListener("click", (event) => {
+    if (event.target === adminDeleteDialog) {
+      adminDeleteDialog.close();
+    }
+  });
+
+  adminDeleteConfirm?.addEventListener("click", async () => {
+    const code = pendingDeleteCode;
+    if (!code) {
+      return;
+    }
+
+    pendingDeleteCode = "";
+    adminDeleteDialog.close();
+    await performCodeAction(code, "delete");
+  });
 }
 
 async function submitReview(type, id, decision) {
@@ -703,10 +785,30 @@ async function submitCodeAction(code, action) {
     return;
   }
 
-  if (action === "delete" && !window.confirm(`确定永久删除兑换码“${code}”吗？关联的使用反馈、奖励反馈和历史提交也会被删除，无法恢复。`)) {
+  if (action === "delete") {
+    openDeleteDialog(code);
     return;
   }
 
+  await performCodeAction(code, action);
+}
+
+function openDeleteDialog(code) {
+  pendingDeleteCode = code;
+  adminDeleteCode.textContent = code;
+
+  if (typeof adminDeleteDialog.showModal === "function") {
+    adminDeleteDialog.showModal();
+    return;
+  }
+
+  if (window.confirm(`确定永久删除兑换码“${code}”吗？关联的使用反馈、奖励反馈和历史提交也会被删除，无法恢复。`)) {
+    pendingDeleteCode = "";
+    performCodeAction(code, "delete");
+  }
+}
+
+async function performCodeAction(code, action) {
   try {
     if (action === "delete") {
       await deleteJson(`/api/admin/gift-codes/${encodeURIComponent(code)}`);

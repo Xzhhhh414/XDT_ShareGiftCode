@@ -693,6 +693,10 @@ h2 {
   overflow-x: auto;
 }
 
+.admin-mobile-page-control {
+  display: none;
+}
+
 .admin-tab {
   display: inline-flex;
   min-height: 42px;
@@ -959,6 +963,11 @@ h2 {
   white-space: nowrap;
 }
 
+.admin-source-mobile-label,
+.admin-delete-mobile {
+  display: none;
+}
+
 .admin-actions {
   display: flex;
   gap: 8px;
@@ -989,6 +998,46 @@ h2 {
 
 .admin-action-placeholder {
   color: var(--muted);
+}
+
+.admin-confirm-dialog {
+  width: min(420px, calc(100% - 32px));
+  border: 0;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 0;
+}
+
+.admin-confirm-dialog::backdrop {
+  background: rgba(15, 35, 25, 0.42);
+}
+
+.admin-confirm-panel {
+  display: grid;
+  gap: 14px;
+  margin: 0;
+  padding: 22px;
+  background: var(--surface);
+}
+
+.admin-confirm-panel h2,
+.admin-confirm-panel p {
+  margin: 0;
+}
+
+.admin-confirm-panel h2 {
+  font-size: 20px;
+}
+
+.admin-confirm-panel p {
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.admin-confirm-actions {
+  display: flex;
+  gap: 8px;
 }
 
 .source-parser-form {
@@ -1183,6 +1232,234 @@ h2 {
 
   .feedback-open-button {
     padding: 0 8px;
+  }
+}
+
+@media (max-width: 760px) {
+  .admin-shell {
+    width: 100%;
+  }
+
+  .admin-header {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    align-items: center;
+    flex-direction: row;
+    background: var(--surface);
+    padding: 12px 0;
+  }
+
+  .admin-header h1 {
+    margin-bottom: 4px;
+    font-size: 22px;
+  }
+
+  .admin-header .admin-action-button {
+    flex: 0 0 auto;
+    min-width: 72px;
+    min-height: 44px;
+  }
+
+  .admin-tabs {
+    display: none;
+  }
+
+  .admin-mobile-page-control:not([hidden]) {
+    display: grid;
+    grid-template-columns: 72px minmax(0, 1fr);
+    align-items: center;
+    gap: 10px;
+    margin-top: 12px;
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 760;
+  }
+
+  .admin-mobile-page-control select {
+    min-height: 44px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--surface);
+    color: var(--text);
+    padding: 0 12px;
+    font: inherit;
+  }
+
+  .admin-page {
+    margin-top: 12px;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    overflow: visible;
+  }
+
+  .admin-panel-header {
+    border-bottom: 0;
+    padding: 4px 0 12px;
+  }
+
+  .admin-panel-header h2 {
+    font-size: 18px;
+  }
+
+  .admin-table-wrap {
+    overflow: visible;
+  }
+
+  .admin-table {
+    display: block;
+    min-width: 0;
+    border-collapse: separate;
+  }
+
+  .admin-table thead {
+    display: none;
+  }
+
+  .admin-table tbody {
+    display: grid;
+    gap: 8px;
+  }
+
+  .admin-table tr {
+    display: block;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--surface);
+    overflow: hidden;
+  }
+
+  .admin-table td {
+    display: grid;
+    grid-template-columns: 84px minmax(0, 1fr);
+    gap: 10px;
+    border-bottom: 1px solid var(--line);
+    padding: 10px 12px;
+    font-size: 14px;
+  }
+
+  .admin-table td::before {
+    content: attr(data-label);
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 760;
+  }
+
+  .admin-table tr:last-child td:last-child,
+  .admin-table td:last-child {
+    border-bottom: 0;
+  }
+
+  .admin-table td[data-label="操作"] {
+    display: block;
+  }
+
+  .admin-table td[data-label="操作"]::before {
+    display: block;
+    margin-bottom: 8px;
+  }
+
+  .admin-table .admin-empty-cell {
+    display: block;
+    min-height: 112px;
+    padding: 42px 12px;
+  }
+
+  .admin-table .admin-empty-cell::before {
+    display: none;
+  }
+
+  .admin-actions {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
+    gap: 8px;
+  }
+
+  .admin-action-button {
+    min-height: 44px;
+  }
+
+  .admin-delete-desktop {
+    display: none;
+  }
+
+  .admin-delete-mobile {
+    display: block;
+    min-width: 0;
+  }
+
+  .admin-delete-mobile summary {
+    display: grid;
+    min-height: 44px;
+    align-items: center;
+    border: 1px solid rgba(31, 138, 91, 0.24);
+    border-radius: var(--radius);
+    background: var(--surface-soft);
+    color: var(--green-strong);
+    cursor: pointer;
+    list-style: none;
+    padding: 0 12px;
+    text-align: center;
+    font-size: 13px;
+    font-weight: 760;
+  }
+
+  .admin-delete-mobile summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .admin-delete-mobile[open] {
+    grid-column: 1 / -1;
+  }
+
+  .admin-delete-mobile[open] summary {
+    margin-bottom: 8px;
+  }
+
+  .admin-source-link {
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+  }
+
+  .admin-source-url {
+    display: none;
+  }
+
+  .admin-source-mobile-label {
+    display: inline;
+  }
+
+  .source-parser-form {
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--surface);
+    padding: 14px;
+  }
+
+  .source-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .source-actions .admin-action-button {
+    min-width: 0;
+  }
+
+  .admin-confirm-dialog {
+    width: 100%;
+    max-width: none;
+    margin: auto 0 0;
+    border-radius: var(--radius) var(--radius) 0 0;
+  }
+
+  .admin-confirm-panel {
+    padding: 22px 16px 24px;
+  }
+
+  .admin-confirm-actions .admin-action-button {
+    min-height: 48px;
   }
 }
 

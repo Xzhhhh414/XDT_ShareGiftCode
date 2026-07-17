@@ -42,10 +42,26 @@
         </button>
       </nav>
 
+      <label class="admin-mobile-page-control" id="adminMobilePageControl" hidden>
+        <span>当前页面</span>
+        <select id="adminMobilePageSelect" aria-label="切换后台页面"></select>
+      </label>
+
       <main class="admin-panel" id="adminPanel" tabindex="-1"></main>
     </div>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <dialog class="admin-confirm-dialog" id="adminDeleteDialog" aria-labelledby="adminDeleteDialogTitle">
+      <form class="admin-confirm-panel" method="dialog">
+        <h2 id="adminDeleteDialogTitle">永久删除兑换码</h2>
+        <p>将永久删除 <span class="admin-code" id="adminDeleteCode"></span> 及其关联记录，无法恢复。</p>
+        <div class="admin-confirm-actions">
+          <button class="admin-action-button" type="submit" value="cancel">取消</button>
+          <button class="admin-action-button danger" id="adminDeleteConfirm" type="button">永久删除</button>
+        </div>
+      </form>
+    </dialog>
 
     <script src="./admin.js"></script>
   </body>
